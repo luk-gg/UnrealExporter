@@ -13,8 +13,6 @@ using CUE4Parse.UE4.Localization;
 using System.Collections.Concurrent;
 using CUE4Parse.MappingsProvider;
 using JSBeautifyLib;
-using System.Runtime.InteropServices;
-using OodleDotNet;
 using CUE4Parse.Compression;
 
 namespace UnrealExporter;
@@ -33,7 +31,7 @@ public class UnrealExporter
     {
         double trueStart = Now();
 
-        // Initialize packages (from FModel's InitOodle())
+        // Initialize CUE4Parse dependencies
         InitOodle();
         InitZlib();
 
