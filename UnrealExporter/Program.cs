@@ -14,6 +14,7 @@ using System.Collections.Concurrent;
 using CUE4Parse.MappingsProvider;
 using JSBeautifyLib;
 using CUE4Parse.Compression;
+using System.Reflection;
 
 namespace UnrealExporter;
 
@@ -26,9 +27,20 @@ public class UnrealExporter
     private static int totalRegexMatches = 0;
     private static int totalExportedFiles = 0;
     private static bool useCheckpoint = false;
+    private static string RootDir = AppContext.BaseDirectory;
 
     public static void Main(string[] args)
     {
+
+#if DEBUG
+        // During development (dotnet run), BaseDirectory is bin\Debug\net8.0
+        // Adjust to project root
+        RootDir = Path.GetFullPath(Path.Combine(RootDir, @"..\..\..\.."));
+#endif
+
+        // For Oodle to work from outside of project directory
+        Directory.SetCurrentDirectory(RootDir);
+
         double trueStart = Now();
 
         // Initialize CUE4Parse dependencies
@@ -248,12 +260,11 @@ public class UnrealExporter
     public static List<ConfigObj> LoadAllConfigs(string[] args)
     {
         List<ConfigObj> allConfigObjs = [];
-        string[] allConfigFilePaths = Directory.GetFiles($"{Directory.GetCurrentDirectory()}\\configs");
-
+        string[] allConfigFilePaths = Directory.GetFiles($"{RootDir}\\configs");
         bool isReleaseMode = false;
 
 #if !DEBUG
-            isReleaseMode = true;
+        isReleaseMode = true;
 #endif
 
         if (args.Length > 0 || isReleaseMode)
@@ -290,7 +301,7 @@ public class UnrealExporter
             {
                 foreach (var arg in args)
                 {
-                    List<ConfigObj>? configObjsInFile = LoadConfigFile($"{Directory.GetCurrentDirectory()}\\configs\\{arg}.json");
+                    List<ConfigObj>? configObjsInFile = LoadConfigFile($"{RootDir}\\configs\\{arg}.json");
 
                     if (configObjsInFile != null)
                     {
@@ -310,7 +321,7 @@ public class UnrealExporter
         else
         {
             Console.WriteLine("No config file(s) specified. Defaulting to config.json...");
-            List<ConfigObj>? configObjsInFile = LoadConfigFile($"{Directory.GetCurrentDirectory()}\\configs\\config.json");
+            List<ConfigObj>? configObjsInFile = LoadConfigFile($"{RootDir}\\configs\\config.json");
 
             if (configObjsInFile != null)
             {
@@ -355,6 +366,7 @@ public class UnrealExporter
     public static AbstractFileProvider CreateProvider(ConfigObj config, EGame selectedVersion)
     {
         // Load CUE4Parse
+        // TODO: Ignore mods (all folders within /Content/Paks)
         var provider = new DefaultFileProvider(config.PaksDir, SearchOption.AllDirectories, true, new VersionContainer(selectedVersion));
         provider.Initialize();
 
@@ -374,7 +386,7 @@ public class UnrealExporter
         }
 
         // TEMP (need to fix patchProvider for utoc/ucas support). For now it's not guaranteed that the patch paks will be reconciled correctly.
-        string pathToMapping = $"{Directory.GetCurrentDirectory()}\\mappings\\{config.GameTitle}.usmap";
+        string pathToMapping = $"{RootDir}\\mappings\\{config.GameTitle}.usmap";
         if (File.Exists(pathToMapping))
         {
             Console.WriteLine($"Using mapping file: {pathToMapping}");
@@ -386,7 +398,7 @@ public class UnrealExporter
         patchProvider.Load(provider);
 
         // Add mapping file based on GameTitle if provided
-        string pathToMappingFile = $"{Directory.GetCurrentDirectory()}\\mappings\\{config.GameTitle}.usmap";
+        string pathToMappingFile = $"{RootDir}\\mappings\\{config.GameTitle}.usmap";
         if (File.Exists(pathToMappingFile))
         {
             Console.WriteLine($"Using mapping file: {pathToMappingFile}");
@@ -620,10 +632,10 @@ public class UnrealExporter
     {
         if (config?.UseCheckpointFile?.Length > 0)
         {
-            string checkpointPath = $"{Directory.GetCurrentDirectory()}\\{config.UseCheckpointFile}";
+            string checkpointPath = $"{RootDir}\\{config.UseCheckpointFile}";
             if (config.UseCheckpointFile.Equals("latest"))
             {
-                string[] allCheckpointPaths = Directory.GetFiles($"{Directory.GetCurrentDirectory()}\\checkpoints");
+                string[] allCheckpointPaths = Directory.GetFiles($"{RootDir}\\checkpoints");
                 var pathsForGameTitle = allCheckpointPaths.Where(path => path.Contains(config.GameTitle));
 
                 if (!pathsForGameTitle.Any())
@@ -680,7 +692,7 @@ public class UnrealExporter
         Console.WriteLine();
         var newCheckpointJson = JsonConvert.SerializeObject(newCheckpointDict, Formatting.Indented);
         var dateStamp = DateTime.Now.ToString("MM-dd-yyyy HH-mm");
-        string checkpointsDirPath = $"{Directory.GetCurrentDirectory()}\\checkpoints";
+        string checkpointsDirPath = $"{RootDir}\\checkpoints";
         if (!Directory.Exists(checkpointsDirPath))
         {
             Directory.CreateDirectory(checkpointsDirPath);

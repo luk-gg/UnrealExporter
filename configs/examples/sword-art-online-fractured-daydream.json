@@ -11,12 +11,12 @@
         "createNewCheckpoint": false,
         "useCheckpointFile": "",
         "export": [
-            "SEVEN_Product/Content/Product/Character/.*\\.uasset:json",
-            "SEVEN_Product/Content/Product/DataTable/.*\\.uasset:json",
-            "SEVEN_Product/Content/Product/DropItem/.*\\.uasset:json",
-            "SEVEN_Product/Content/Product/UI/.*\\.uasset:png",
-            "SEVEN_Product/Content/Product/Weapon/.*\\.uasset:json",
-            "SEVEN_Product/Content/Localization/.*\\.uasset:json"
+            "SEVEN_Product/Content/(Product|Season[^/]+)/Character/.*\\.uasset:json",
+            "SEVEN_Product/Content/(Product|Season[^/]+)/DataTable/.*\\.uasset:json",
+            "SEVEN_Product/Content/(Product|Season[^/]+)/DropItem/.*\\.uasset:json",
+            "SEVEN_Product/Content/(Product|Season[^/]+)/UI/.*\\.uasset:png",
+            "SEVEN_Product/Content/(Product|Season[^/]+)/Weapon/.*\\.uasset:json",
+            "SEVEN_Product/Content/Localization/.*\\.locres:json"
         ],
         "exclude": []
     }

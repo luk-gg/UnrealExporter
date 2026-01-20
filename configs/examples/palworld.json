@@ -15,7 +15,8 @@
             "Pal/Content/Pal/DataAsset/.*\\.uasset:json",
             "Pal/Content/Pal/DataTable/.*\\.uasset:json",
             "Pal/Content/Pal/Maps/.*\\.uasset:json",
-            "Pal/Content/Pal/Texture/.*\\.uasset:png"
+            "Pal/Content/Pal/Texture/.*\\.uasset:png",
+            "Pal/Content/L10N/.*\\.uasset:json"
         ],
         "exclude": [
             "Pal/Content/Pal/Blueprint/MapObject/.*",
