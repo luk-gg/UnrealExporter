@@ -23,6 +23,7 @@ When listing an export file path, specify the desired output type at the end, su
 - [x] locres (as json)
 - [x] js (as js)
 - [x] db (as db)
+- [x] upluginmanifest, uproject, manifest, uplugin, archive, vmodule, verse, html, json, ini, txt, log, bat, dat, cfg, ide, ipl, zon, xml, css, csv, pem, tps, lua, po, h (as their respective type)
 - [ ] everything else
 
 ## [Usage](#usage)

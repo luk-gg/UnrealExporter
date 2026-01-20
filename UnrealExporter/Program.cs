@@ -592,6 +592,44 @@ public class UnrealExporter
                                 }
                                 break;
                             }
+                        case "upluginmanifest":
+                        case "uproject":
+                        case "manifest":
+                        case "uplugin":
+                        case "archive":
+                        case "vmodule":
+                        case "verse":
+                        case "html":
+                        case "json":
+                        case "ini":
+                        case "txt":
+                        case "log":
+                        case "bat":
+                        case "dat":
+                        case "cfg":
+                        case "ide":
+                        case "ipl":
+                        case "zon":
+                        case "xml":
+                        case "css":
+                        case "csv":
+                        case "pem":
+                        case "tps":
+                        case "lua":
+                        case "po":
+                        case "h":
+                        {
+                            if (outputType == fileType && provider.TrySaveAsset(file.Value.Path, out var data))
+                            {
+                                if (config.LogOutputs) Console.WriteLine("=> " + outputPath + "." + outputType);
+                                using var stream = new MemoryStream(data) { Position = 0 };
+                                using var reader = new StreamReader(stream);
+                                if (!Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
+                                File.WriteAllText(outputPath + "." + outputType, reader.ReadToEnd());
+                                Interlocked.Increment(ref totalExportedFiles);
+                            }
+                            break;
+                        }
                         case "db":
                             {
                                 if (outputType == fileType && provider.TrySaveAsset(file.Value.Path, out var data))
