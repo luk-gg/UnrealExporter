@@ -1,0 +1,391 @@
+using Spectre.Console;
+using Spectre.Console.Cli;
+using Slugify;
+using Newtonsoft.Json;
+using System.Reflection.Emit;
+using System.Diagnostics;
+using System.Text;
+using System.Reflection;
+using System.ComponentModel;
+
+public sealed class SelectionOption
+{
+    public string Label { get; set; } = "";
+    public ConfigObj? Config { get; set; }
+    public string ConfigPath { get; set; } = "";
+}
+
+public sealed class ConfigObj
+{
+    /// <summary>
+    /// A name of the config file. Used when listing configs or in error messages.
+    /// </summary>
+    /// <remarks>
+    /// If this title matches the game title, a <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">custom UE version</a> may be automatically detected.
+    /// </remarks>
+    public string? ConfigTitle { get; set; }
+
+    /// <summary>
+    /// A path to the directory containing the game's files.
+    /// </summary>
+    public string GamePath { get; set; } = "";
+
+    /// <summary>
+    /// A path to a directory that will contain extracted assets.
+    /// </summary>
+    public string OutputPath { get; set; } = "";
+
+    /// <summary>
+    /// The Unreal Engine version used to compile the game.
+    /// </summary>
+    /// <remarks>
+    /// Often found in the game's Win64-Shipping.exe file details. Some games use a <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">custom offset</a>.
+    /// </remarks>
+    public string EngineVersion { get; set; } = "";
+
+    /// <summary>
+    /// A list of AES-256 encryption keys to load.
+    /// </summary>
+    public string[] AesKeys { get; set; } = [];
+
+    /// <summary>
+    /// A list of absolute paths to <c>.usmap</c> files to load.
+    /// </summary>
+    public string[] MappingFiles { get; set; } = [];
+
+    /// <summary>
+    /// A list of virtual file paths to assets to be extracted.
+    /// </summary>
+    /// <remarks>
+    /// Specify the desired file extension with a colon, such as <c>MyGame\DataTables\.*.uasset:json</c>, <c>MyGame\UI\.*.uasset:png</c>.
+    /// </remarks>
+    public string[] ExportPaths { get; set; } = [];
+
+    /// <summary>
+    /// A list of virtual file paths to assets to be <b>excluded</b> from extraction, useful for avoiding files that crash CUE4Parse.
+    /// </summary>
+    public string[] ExcludePaths { get; set; } = [];
+}
+
+public class ConfigService()
+{
+    public static string ConfigsDirectory = Path.Combine(AppContext.BaseDirectory, "configs");
+
+    public static void CreateConfig()
+    {
+        AnsiConsole.Clear();
+        AnsiConsole.MarkupLine("[green]Green[/] values will auto-complete if left blank.\n");
+
+        var config = new ConfigObj
+        {
+            ConfigTitle = Ask("Config/game title", "MyGame"),
+            GamePath = Ask("Game folder", Path.Combine("C:", "Program Files", "MyGame")),
+            OutputPath = Ask("Output folder", Path.Combine(AppContext.BaseDirectory, "output"), true),
+        };
+
+        AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
+        var detectedEngineVersion = DetectEngineVersion(config.GamePath);
+
+        config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrEmpty(detectedEngineVersion));
+
+        AnsiConsole.MarkupLine("[blue]Use spaces to separate multiple values for the following prompts.[/]");
+        AnsiConsole.MarkupLine("[blue]Some games require additional decryption or mapping files.[/]");
+
+        // AES and mappings might be replaceable with a universal AES.txt and /mappings and just loading all
+        config.AesKeys = Ask("AES keys", "0x...").Split(" ");
+
+        config.MappingFiles = Ask(
+                "Paths to mapping files",
+                Path.Combine(".", "mappings", "MyGame.usmap")
+            ).Split(" ");
+
+        config.ExportPaths = Ask(
+                "Virtual paths to extract",
+                $"{Path.Combine("MyGame", "DataTables", ".*.uasset:json")} {Path.Combine("MyGame", "UI", ".*.uasset:png")}"
+            ).Split(" ");
+
+        config.ExcludePaths = Ask(
+                "Virtual paths to [bold]exclude[/]", 
+                Path.Combine("MyGame", "UI", "UserInterface", ".*")
+            ).Split(" ");
+
+        var fileName = GetValidFileName(
+                Ask("Name your config file", GetValidFileName(config.ConfigTitle, ".json"), true), ".json");
+
+        var path = Path.Combine(ConfigsDirectory, fileName);
+
+        var json = JsonConvert.SerializeObject(
+            config,
+            Formatting.Indented,
+            new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
+
+        File.WriteAllText(path, json);
+
+        AnsiConsole.Clear();
+        AnsiConsole.MarkupLine($"[green]Added {config.ConfigTitle} [dim]({Markup.Escape(fileName)})[/][/]");
+    }
+
+    public static ConfigObj LoadConfig(string path)
+    {
+        var fileLink = $"[gray]([underline]{Markup.Escape(Path.GetFileName(path))}[/])[/]";
+        try
+        {
+            var jsonString = File.ReadAllText(path);
+            var config = JsonConvert.DeserializeObject<ConfigObj>(jsonString)
+                ?? throw new InvalidDataException($"[bold red]Error while loading config:[/] file is null {fileLink}");
+            return config;
+        }
+        catch (FileNotFoundException ex)
+        {
+            throw new FileNotFoundException($"[bold red]Error while loading config:[/] file not found {fileLink}", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"[bold red]Error while loading config:[/] file is not valid JSON {fileLink}", ex);
+        }
+    }
+
+    public static ValidationResult ValidateConfig(ConfigObj config)
+    {
+        // 1) GamePath must exist
+        if (string.IsNullOrWhiteSpace(config.GamePath))
+            return ValidationResult.Error("Missing game directory");
+
+        var gameDir = config.GamePath.Trim().Trim('"');
+
+        try
+        {
+            gameDir = Path.GetFullPath(gameDir);
+        }
+        catch (Exception ex)
+        {
+            return ValidationResult.Error($"GamePath is not a valid path: [gray]({ex.Message})[/]");
+        }
+
+        if (!Directory.Exists(gameDir))
+            return ValidationResult.Error($"GamePath [gray]\"{gameDir}\"[/] does not exist");
+
+        // 2) OutputPath must be valid + creatable/writable
+        if (string.IsNullOrWhiteSpace(config.OutputPath))
+            return ValidationResult.Error("Missing output directory");
+
+        var outDir = config.OutputPath.Trim().Trim('"');
+
+        try
+        {
+            outDir = Path.GetFullPath(outDir);
+        }
+        catch (Exception ex)
+        {
+            return ValidationResult.Error($"Output directory is not a valid path: {ex.Message}");
+        }
+
+        // Attempt create directory
+        try
+        {
+            Directory.CreateDirectory(outDir);
+        }
+        catch (Exception ex)
+        {
+            return ValidationResult.Error($"Output directory could not be created: [green]{outDir}[/]. {ex.Message}");
+        }
+
+        // Verify we can write to it (create + delete a temp file)
+        try
+        {
+            var testFile = Path.Combine(outDir, $".write_test_{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+        }
+        catch (Exception ex)
+        {
+            return ValidationResult.Error($"Output directory is not writable: [green]{outDir}[/]. {ex.Message}");
+        }
+
+        // Normalize cleaned paths back into config
+        config.GamePath = gameDir;
+        config.OutputPath = outDir;
+
+        return ValidationResult.Success();
+    }
+
+    public static ConfigObj PromptConfigSelection()
+    {
+        List<SelectionOption> options = [];
+
+        if (Directory.Exists(ConfigsDirectory))
+        {
+            var configPaths = Directory
+                .EnumerateFiles(ConfigsDirectory, "*.json", SearchOption.TopDirectoryOnly)
+                .ToList();
+
+            foreach (var path in configPaths)
+            {
+                var config = LoadConfig(path);
+                if (config is null) continue;
+                var fileName = Path.GetFileName(path);
+                options.Add(new SelectionOption
+                {
+                    Label = $"{config.ConfigTitle} [dim]({fileName})[/]",
+                    Config = config,
+                    ConfigPath = path
+                });
+            }
+        }
+        else Directory.CreateDirectory(ConfigsDirectory);
+
+        options.Add(new SelectionOption() { Label = "Create new config" });
+
+        var selectedOption = AnsiConsole.Prompt(
+            new SelectionPrompt<SelectionOption>()
+                .Title("Select a config file or re-run unrealexporter with flags [dim](unrealexporter --help)[/] to begin extraction:")
+                .WrapAround()
+                .EnableSearch()
+                .UseConverter(option => option.Label)
+                .AddChoices(options));
+
+        // "Create new config"
+        if (selectedOption.Config == null)
+        {
+            CreateConfig();
+            return PromptConfigSelection();
+        }
+
+        AnsiConsole.Clear();
+        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(selectedOption.Config.ConfigTitle)}\" [dim]([underline]{Markup.Escape(Path.GetFileName(selectedOption.ConfigPath))}[/])[/][/]");
+
+        return selectedOption.Config;
+    }
+
+    public static string StringifyConfig(ConfigObj config)
+    {
+        string result = "";
+
+        string QuoteIfNeeded(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return value;
+
+            // If contains whitespace or quotes, wrap in quotes and escape inner quotes
+            if (value.Any(c => char.IsWhiteSpace(c) || c == '"'))
+                return $"\"{value.Replace("\"", "\\\"")}\"";
+
+            return value;
+        }
+
+        void Add(string flag, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            result += $"{flag} {QuoteIfNeeded(value)} ";
+        }
+
+        void AddMany(string flag, IEnumerable<string> values)
+        {
+            foreach (var value in values.Where(v => !string.IsNullOrWhiteSpace(v)))
+            {
+                Add(flag, value);
+            }
+        }
+
+        Add("-t", config.ConfigTitle);
+        Add("-p", config.GamePath);
+        Add("-o", config.OutputPath);
+
+        AddMany("--aes", config.AesKeys ?? []);
+        AddMany("--map", config.MappingFiles ?? []);
+        AddMany("--export", config.ExportPaths ?? []);
+        AddMany("--exclude", config.ExcludePaths ?? []);
+
+        return result.Trim();
+    }
+
+    // Helpers
+    public static string GetValidFileName(string fileName, string? extension)
+    {
+        // Only supports alphanumeric characters
+        SlugHelper slugHelper = new SlugHelper();
+        var safeFileName = slugHelper.GenerateSlug(fileName);
+        if (!string.IsNullOrEmpty(extension) && !fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+        {
+            safeFileName += extension;
+        }
+        return safeFileName;
+    }
+
+    static string Ask(string text, string hint, bool hintIsDefaultValue = false)
+    {
+        if (!hintIsDefaultValue) text += $" [dim]({hint})[/]:";
+        var prompt = new TextPrompt<string>(text).AllowEmpty();
+        if (hintIsDefaultValue) prompt.DefaultValue(hint);
+        return AnsiConsole.Prompt(prompt);
+    }
+
+    // TODO: Try using ConfigTitle to find matching custom UE version in CUE4Parse
+    static string? DetectEngineVersion(string GamePath)
+    {
+
+        static string? FindGameExe(string gameDir)
+        {
+            // Prefer typical UE folder
+            var binaries = Path.Combine(gameDir, "Binaries", "Win64");
+            if (Directory.Exists(binaries))
+            {
+                var shipping = Directory.EnumerateFiles(binaries, "*-Shipping.exe", SearchOption.TopDirectoryOnly)
+                    .Select(p => new FileInfo(p))
+                    .OrderByDescending(f => f.Length)
+                    .FirstOrDefault();
+
+                if (shipping != null) return shipping.FullName;
+
+                var anyExe = Directory.EnumerateFiles(binaries, "*.exe", SearchOption.TopDirectoryOnly)
+                    .Select(p => new FileInfo(p))
+                    .OrderByDescending(f => f.Length)
+                    .FirstOrDefault();
+
+                if (anyExe != null) return anyExe.FullName;
+            }
+
+            // Fallback: search a little wider but don't scan the entire disk
+            var exes = Directory.EnumerateFiles(gameDir, "*.exe", SearchOption.AllDirectories)
+                .Where(p => p.Contains($"{Path.DirectorySeparatorChar}Binaries{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Select(p => new FileInfo(p))
+                .OrderByDescending(f => f.Length)
+                .Take(10)
+                .ToList();
+
+            return exes.FirstOrDefault()?.FullName;
+        }
+
+        var gameExePath = FindGameExe(GamePath);
+
+        if (string.IsNullOrEmpty(gameExePath))
+        {
+            AnsiConsole.WriteLine("[dim]Unable to locate executable file[/]");
+            return null;
+        }
+
+        var fvi = FileVersionInfo.GetVersionInfo(gameExePath);
+
+        // these seem to be identical
+        string version = "";
+        bool hasProductVersion = fvi.ProductMajorPart + fvi.ProductMinorPart > 0;
+        bool hasFileVersion = fvi.FileMajorPart + fvi.FileMinorPart > 0;
+
+        if (hasProductVersion) version = $"{fvi.ProductMajorPart}.{fvi.ProductMinorPart}";
+        if (hasFileVersion) version = $"{fvi.FileMajorPart}.{fvi.FileMinorPart}";
+
+        if (!string.IsNullOrEmpty(version))
+        {
+            AnsiConsole.MarkupLine($"[blue]Found version {version}, but [link=https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs]some games[/] require a custom version[/].");
+            return version;
+        }
+        
+        AnsiConsole.WriteLine("[dim]Executable didn't contain version info[/]");
+        return null;
+    }
+};
