@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Reflection;
 using System.ComponentModel;
+using System.Text.RegularExpressions;
 
 public sealed class SelectionOption
 {
@@ -79,33 +80,49 @@ public class ConfigService()
         var config = new ConfigObj
         {
             ConfigTitle = Ask("Config/game title", "MyGame"),
-            GamePath = Ask("Game folder", Path.Combine("C:", "Program Files", "MyGame")),
-            OutputPath = Ask("Output folder", Path.Combine(AppContext.BaseDirectory, "output"), true),
         };
+
+        while (true)
+        {
+            config.GamePath = NormalizePath(Ask("Game folder", Path.Combine("C:", "Program Files", "MyGame")), true);
+            if (IsValidPath(config.GamePath) && Directory.Exists(config.GamePath)) break;
+        }
+
+        while (true)
+        {
+            config.OutputPath = NormalizePath(Ask("Output folder", Path.Combine(AppContext.BaseDirectory, "output"), true), true);
+            if (IsValidPath(config.OutputPath) && IsDirectoryWritable(config.OutputPath)) break;
+        }
 
         AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
         var detectedEngineVersion = DetectEngineVersion(config.GamePath);
-
         config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrEmpty(detectedEngineVersion));
 
         AnsiConsole.MarkupLine("[blue]Use spaces to separate multiple values for the following prompts.[/]");
         AnsiConsole.MarkupLine("[blue]Some games require additional decryption or mapping files.[/]");
+        
+        // AES and mappings might be replaceable with a universal AES.txt and /mappings and just loading all; performance needs to be tested
+        while (true)
+        {
+            config.AesKeys = Ask("AES keys", "0x...").Split(" ");
+            if (config.AesKeys.Length < 2 || config.AesKeys.All(k => IsValidAesKey(k))) break;
+        }
 
-        // AES and mappings might be replaceable with a universal AES.txt and /mappings and just loading all
-        config.AesKeys = Ask("AES keys", "0x...").Split(" ");
-
+        // validate paths
         config.MappingFiles = Ask(
                 "Paths to mapping files",
                 Path.Combine(".", "mappings", "MyGame.usmap")
             ).Split(" ");
 
+        // validate paths
         config.ExportPaths = Ask(
                 "Virtual paths to extract",
                 $"{Path.Combine("MyGame", "DataTables", ".*.uasset:json")} {Path.Combine("MyGame", "UI", ".*.uasset:png")}"
             ).Split(" ");
 
+        // validate paths
         config.ExcludePaths = Ask(
-                "Virtual paths to [bold]exclude[/]", 
+                "Virtual paths to [bold]exclude[/]",
                 Path.Combine("MyGame", "UI", "UserInterface", ".*")
             ).Split(" ");
 
@@ -148,6 +165,7 @@ public class ConfigService()
         }
     }
 
+    // TODO: Validate other fields if provided
     public static ValidationResult ValidateConfig(ConfigObj config)
     {
         // 1) GamePath must exist
@@ -365,7 +383,7 @@ public class ConfigService()
 
         if (string.IsNullOrEmpty(gameExePath))
         {
-            AnsiConsole.WriteLine("[dim]Unable to locate executable file[/]");
+            AnsiConsole.MarkupLine("[dim]Unable to locate executable file[/]");
             return null;
         }
 
@@ -384,8 +402,89 @@ public class ConfigService()
             AnsiConsole.MarkupLine($"[blue]Found version {version}, but [link=https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs]some games[/] require a custom version[/].");
             return version;
         }
-        
+
         AnsiConsole.WriteLine("[dim]Executable didn't contain version info[/]");
         return null;
+    }
+
+    public static string NormalizePath(string path, bool allowEmpty = false)
+    {
+        if (!allowEmpty && string.IsNullOrWhiteSpace(path))
+            throw new ArgumentException("Path cannot be null or empty.");
+
+        // Trim whitespace and surrounding quotes
+        path = path.Trim().Trim('"');
+
+        // Expand environment variables (e.g. %LOCALAPPDATA%)
+        path = Environment.ExpandEnvironmentVariables(path);
+
+        try
+        {
+            // Convert relative paths to absolute based on current working directory
+            var fullPath = Path.GetFullPath(path);
+
+            // Optional: normalize directory separators
+            fullPath = Path.GetFullPath(new Uri(fullPath).LocalPath)
+                           .TrimEnd(Path.DirectorySeparatorChar);
+
+            return fullPath;
+        }
+        catch (Exception ex)
+        {
+            throw new ArgumentException($"Invalid path: {path}. {ex.Message}", ex);
+        }
+    }
+
+    // Allow blank path ("to be edited later") but reject invalid characters
+    public static bool IsValidPath(string path)
+    {
+        try
+        {
+            // TODO: Regex to test if the path that was normalized is valid (i.e. not C:\:::)
+            return true;
+        }
+        catch (ArgumentException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
+        }
+        return false;
+    }
+
+    public static bool IsValidAesKey(string key, bool allowEmpty = false)
+    {
+        if (!allowEmpty && string.IsNullOrWhiteSpace(key))
+            return false;
+
+        key = key.Trim();
+
+        // For a more specific error message:
+        // Must be exactly 64 hex characters (256-bit key)
+        // if (key.Length != 64)
+        //     return false;
+
+        // Ensure only hex characters
+        return Regex.IsMatch(key, @"^0x[0-9a-fA-F]{64}$");
+    }
+
+    public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
+    {
+        try
+        {
+            using FileStream fs = File.Create(
+                Path.Combine(
+                    dirPath,
+                    Path.GetRandomFileName()
+                ),
+                1,
+                FileOptions.DeleteOnClose);
+            return true;
+        }
+        catch
+        {
+            if (throwIfFails)
+                throw;
+            else
+                return false;
+        }
     }
 };

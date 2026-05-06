@@ -3,10 +3,54 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 using System.ComponentModel;
 
+
+
+using Newtonsoft.Json;
+using System.Globalization;
+using CUE4Parse.Encryption.Aes;
+using CUE4Parse.FileProvider;
+using CUE4Parse.UE4.Objects.Core.Misc;
+using CUE4Parse.UE4.Versions;
+using CUE4Parse.Utils;
+using System.Text.RegularExpressions;
+using CUE4Parse.UE4.Assets.Exports.Texture;
+using CUE4Parse_Conversion.Textures;
+using SkiaSharp;
+using CUE4Parse.UE4.Localization;
+using System.Collections.Concurrent;
+using CUE4Parse.MappingsProvider;
+using JSBeautifyLib;
+using CUE4Parse.Compression;
+using System.Reflection;
+
 public class UnrealExporter
 {
     public static void Main(string[] args)
     {
+
+        var provider = new DefaultFileProvider("Z:\\Games\\Tower of Fantasy Global", SearchOption.AllDirectories, true, new VersionContainer((EGame)Enum.Parse(typeof(EGame), $"GAME_UE4_27")));
+        provider.Initialize();
+
+        var start = Now();
+        // Check .usmap file load time, decide if we using universal keys.txt and /mappings folder
+
+        // 4-5s for 1000 keys
+        // ~38s for 1000 .usmap
+        for (int i = 0; i < 1000; i++)
+        {
+            var hexBody = i.ToString("X").PadLeft(64, '0');
+            var key = "0x" + hexBody;
+            // var key = "0x78F3113C2023D2EBA7C863901A37891E7575C1C96D94338C0B0071A32DBCB2FD";
+            // Console.WriteLine(key);
+            // provider.SubmitKey(new FGuid(), new FAesKey(key));
+            string pathToMapping = $".\\mappings\\Palworld.usmap";
+            provider.MappingsContainer = new FileUsmapTypeMappingsProvider(pathToMapping);
+        }
+
+        AnsiConsole.MarkupLine($"{Elapsed(start, Now())} milliseconds elapsed");
+
+        return;
+
         var cli = new CommandApp<ExporterCli>();
 
         cli.Configure(conf =>
@@ -21,6 +65,16 @@ public class UnrealExporter
         });
 
         cli.Run(args);
+    }
+
+    public static double Now()
+    {
+        return DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds;
+    }
+
+    public static string Elapsed(double start, double end, int factor = 1)
+    {
+        return ((end - start) / factor).ToString("0.00");
     }
 
     public sealed class CliSettings : CommandSettings
