@@ -13,56 +13,106 @@ public class ConfigService
         // AnsiConsole.Clear();
         AnsiConsole.MarkupLine("Values in [dim]parentheses[/] are examples, and [green]green[/] values will auto-complete if left blank.\n");
 
-        // TODO: Should this allow for blank strings? "(leave blank to use the file name)"?
+
         var config = new ConfigObj
         {
-            ConfigTitle = Ask("Enter a title for your config file", "My Game"),
+            ConfigTitle = Ask("Enter the game title", "My Game")
         };
+        while (string.IsNullOrWhiteSpace(config.ConfigTitle))
+        {
+            AnsiConsole.MarkupLine($"[red]Game title cannot be blank.[/]");
+            config.ConfigTitle = Ask();
+        }
         AnsiConsole.WriteLine("");
 
-        config.GamePath = Ask("Where are the game's files?", Path.Combine("C:", "Program Files", "MyGame"));
+
+        config.GamePath = Ask("Where is the game folder?", Path.Combine("C:", "Program Files", "MyGame"));
         while (!Directory.Exists(config.GamePath))
         {
-            AnsiConsole.MarkupLine($"[red]Path \"{config.GamePath}\" does not exist. [/]");
+            AnsiConsole.MarkupLine($"[red]Path \"{config.GamePath}\" does not exist.[/]");
             config.GamePath = Ask();
         }
         AnsiConsole.WriteLine("");
 
+
         config.OutputPath = Ask("Where should extracted files be saved?", Path.Combine(config.GamePath, "extracted"), true);
         while (!PathHelpers.IsDirectoryWritable(config.OutputPath, out _))
         {
-            AnsiConsole.MarkupLine($"[red]Directory \"{config.OutputPath}\" is not writable: \"{Markup.Escape(config.OutputPath)}\"[/]");
+            AnsiConsole.MarkupLine($"[red]Directory \"{config.OutputPath}\" is not writable.[/]");
             config.OutputPath = Ask();
         }
         AnsiConsole.WriteLine("");
 
+
         AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
         var detectedEngineVersion = DetectEngineVersion(config.GamePath);
-        config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrEmpty(detectedEngineVersion));
 
-        AnsiConsole.MarkupLine("[blue]Use spaces to separate multiple values for the following prompts.[/]");
-        AnsiConsole.MarkupLine("[blue]Some games require additional decryption or mapping files.[/]");
+        config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrWhiteSpace(detectedEngineVersion));
+        while (string.IsNullOrWhiteSpace(config.EngineVersion))
+        {
+            AnsiConsole.MarkupLine($"[red]Unreal Engine version cannot be blank.[/]");
+            config.EngineVersion = Ask();
+        }
+        AnsiConsole.WriteLine("");
 
+
+        AnsiConsole.MarkupLine("[blue]Some games require additional decryption or mapping files.[/]\n");
+
+
+        AnsiConsole.MarkupLine("Enter AES keys if needed [dim](0x...)[/]:");
+        AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
+        var aesKeys = new List<string>();
         while (true)
         {
-            config.AesKeys = Ask("AES keys", "0x...").Split(" ");
-            if (config.AesKeys.Length < 2 || config.AesKeys.All(k => PathHelpers.IsValidAesKey(k))) break;
+            var key = Ask();
+            if (string.IsNullOrWhiteSpace(key)) break;
+            if (!PathHelpers.IsValidAesKey(key))
+            {
+                AnsiConsole.MarkupLine($"[red]AES key \"{key}\" is not valid. Expected \"0x\" followed by 64 hexadecimal characters.[/]");
+                continue;
+            }
+            aesKeys.Add(key);
         }
+        config.AesKeys = aesKeys.ToArray();
+        AnsiConsole.WriteLine("");
 
-        config.MappingFiles = Ask(
-                "Paths to mapping files",
-                Path.Combine(".", "mappings", "MyGame.usmap")
-            ).Split(" ");
 
-        config.ExportPaths = Ask(
-                "Virtual paths to extract",
-                $"{Path.Combine("MyGame", "DataTables", ".*.uasset:json")} {Path.Combine("MyGame", "UI", ".*.uasset:png")}"
-            ).Split(" ");
+        AnsiConsole.MarkupLine($"Path to .usmap mapping file if needed [dim]({Path.Combine(".", "mappings", "MyGame.usmap")})[/]:");
+        AnsiConsole.MarkupLine("[dim italic]Leave blank to skip[/]");
+        config.MappingFile = Ask();
+        while (!string.IsNullOrWhiteSpace(config.MappingFile) && !File.Exists(config.MappingFile))
+        {
+            AnsiConsole.MarkupLine($"[red]File \"{config.MappingFile}\" not found.[/]");
+            config.MappingFile = Ask();
+        }
+        AnsiConsole.WriteLine("");
 
-        config.ExcludePaths = Ask(
-                "Virtual paths to [bold]exclude[/]",
-                Path.Combine("MyGame", "UI", "UserInterface", ".*")
-            ).Split(" ");
+
+        AnsiConsole.MarkupLine($"Virtual paths to extract and their output file types [dim]({Path.Combine("MyGame", "DataTables", ".*.uasset:json")}, {Path.Combine("MyGame", "UI", ".*.uasset:png")})[/]:");
+        AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
+        var exportPaths = new List<string>();
+        while (true)
+        {
+            var p = Ask();
+            if (string.IsNullOrWhiteSpace(p)) break;
+            exportPaths.Add(p);
+        }
+        config.ExportPaths = exportPaths.ToArray();
+        AnsiConsole.WriteLine("");
+
+
+        AnsiConsole.MarkupLine($"Virtual paths to [bold]exclude[/] [dim]({Path.Combine("MyGame", "UI", "UserInterface", ".*")})[/]:");
+        AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
+        var excludePaths = new List<string>();
+        while (true)
+        {
+            var p = Ask();
+            if (string.IsNullOrWhiteSpace(p)) break;
+            excludePaths.Add(p);
+        }
+        config.ExcludePaths = exportPaths.ToArray();
+        AnsiConsole.WriteLine("");
+
 
         var fileName = GetValidFileName(
                 Ask("Name your config file", GetValidFileName(config.ConfigTitle ?? "config", ".json"), true), ".json");
@@ -239,7 +289,7 @@ public class ConfigService
         Add("-p", config.GamePath);
         Add("-o", config.OutputPath);
         AddMany("--aes", config.AesKeys ?? []);
-        AddMany("--map", config.MappingFiles ?? []);
+        Add("--map", config.MappingFile);
         AddMany("--export", config.ExportPaths ?? []);
         AddMany("--exclude", config.ExcludePaths ?? []);
 
@@ -309,7 +359,7 @@ public class ConfigService
 
         if (string.IsNullOrEmpty(gameExePath))
         {
-            AnsiConsole.MarkupLine("[dim]Unable to locate executable file[/]");
+            AnsiConsole.MarkupLine("[dim]Unable to locate executable file.[/]\n");
             return null;
         }
 
@@ -324,11 +374,11 @@ public class ConfigService
 
         if (!string.IsNullOrEmpty(version))
         {
-            AnsiConsole.MarkupLine($"[blue]Found version {version}, but [link=https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs]some games[/] require a custom version[/].");
+            AnsiConsole.MarkupLine($"[blue]Found version {version}, but [underline link=https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs]some games[/] require a custom version.[/]\n");
             return version;
         }
 
-        AnsiConsole.WriteLine("[dim]Executable didn't contain version info[/]");
+        AnsiConsole.WriteLine("[dim]Executable didn't contain version info.[/]\n");
         return null;
     }
 }

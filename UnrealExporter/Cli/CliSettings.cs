@@ -28,8 +28,8 @@ public sealed class CliSettings : CommandSettings
     public string[] AesKeys { get; set; } = [];
 
     [CommandOption("--map")]
-    [Description("Path to mapping file (.usmap) (repeatable)")]
-    public string[] MappingFiles { get; set; } = [];
+    [Description("Path to mapping file (.usmap)")]
+    public string MappingFile { get; set; } = "";
 
     [CommandOption("-e|--export")]
     [Description("Virtual paths to extract (regex) (repeatable)")]

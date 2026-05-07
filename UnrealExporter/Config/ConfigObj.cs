@@ -39,9 +39,9 @@ public sealed class ConfigObj
     public string[] AesKeys { get; set; } = [];
 
     /// <summary>
-    /// A list of absolute paths to <c>.usmap</c> files to load.
+    /// An absolute path to a <c>.usmap</c> file to load.
     /// </summary>
-    public string[] MappingFiles { get; set; } = [];
+    public string MappingFile { get; set; } = "";
 
     /// <summary>
     /// A list of virtual file paths to assets to be extracted.
