@@ -1,98 +1,40 @@
+// Config/ConfigService.cs
 using Spectre.Console;
-using Spectre.Console.Cli;
 using Slugify;
 using Newtonsoft.Json;
-using System.Reflection.Emit;
 using System.Diagnostics;
-using System.Text;
-using System.Reflection;
-using System.ComponentModel;
-using System.Text.RegularExpressions;
 
-public sealed class SelectionOption
-{
-    public string Label { get; set; } = "";
-    public ConfigObj? Config { get; set; }
-    public string ConfigPath { get; set; } = "";
-}
-
-public sealed class ConfigObj
-{
-    /// <summary>
-    /// A name of the config file. Used when listing configs or in error messages.
-    /// </summary>
-    /// <remarks>
-    /// If this title matches the game title, a <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">custom UE version</a> may be automatically detected.
-    /// </remarks>
-    public string? ConfigTitle { get; set; }
-
-    /// <summary>
-    /// A path to the directory containing the game's files.
-    /// </summary>
-    public string GamePath { get; set; } = "";
-
-    /// <summary>
-    /// A path to a directory that will contain extracted assets.
-    /// </summary>
-    public string OutputPath { get; set; } = "";
-
-    /// <summary>
-    /// The Unreal Engine version used to compile the game.
-    /// </summary>
-    /// <remarks>
-    /// Often found in the game's Win64-Shipping.exe file details. Some games use a <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">custom offset</a>.
-    /// </remarks>
-    public string EngineVersion { get; set; } = "";
-
-    /// <summary>
-    /// A list of AES-256 encryption keys to load.
-    /// </summary>
-    public string[] AesKeys { get; set; } = [];
-
-    /// <summary>
-    /// A list of absolute paths to <c>.usmap</c> files to load.
-    /// </summary>
-    public string[] MappingFiles { get; set; } = [];
-
-    /// <summary>
-    /// A list of virtual file paths to assets to be extracted.
-    /// </summary>
-    /// <remarks>
-    /// Specify the desired file extension with a colon, such as <c>MyGame\DataTables\.*.uasset:json</c>, <c>MyGame\UI\.*.uasset:png</c>.
-    /// </remarks>
-    public string[] ExportPaths { get; set; } = [];
-
-    /// <summary>
-    /// A list of virtual file paths to assets to be <b>excluded</b> from extraction, useful for avoiding files that crash CUE4Parse.
-    /// </summary>
-    public string[] ExcludePaths { get; set; } = [];
-}
-
-public class ConfigService()
+public class ConfigService
 {
     public static string ConfigsDirectory = Path.Combine(AppContext.BaseDirectory, "configs");
 
     public static void CreateConfig()
     {
-        AnsiConsole.Clear();
-        AnsiConsole.MarkupLine("[green]Green[/] values will auto-complete if left blank.\n");
+        // AnsiConsole.Clear();
+        AnsiConsole.MarkupLine("Values in [dim]parentheses[/] are examples, and [green]green[/] values will auto-complete if left blank.\n");
 
+        // TODO: Should this allow for blank strings? "(leave blank to use the file name)"?
         var config = new ConfigObj
         {
-            ConfigTitle = Ask("Config/game title", "MyGame"),
+            ConfigTitle = Ask("Enter a title for your config file", "My Game"),
         };
+        AnsiConsole.WriteLine("");
 
-        while (true)
+        config.GamePath = Ask("Where are the game's files?", Path.Combine("C:", "Program Files", "MyGame"));
+        while (!Directory.Exists(config.GamePath))
         {
-            config.GamePath = NormalizePath(Ask("Game folder", Path.Combine("C:", "Program Files", "MyGame")), true);
-            if (IsValidPath(config.GamePath) && Directory.Exists(config.GamePath)) break;
+            AnsiConsole.MarkupLine($"[red]Path \"{config.GamePath}\" does not exist. [/]");
+            config.GamePath = Ask();
         }
+        AnsiConsole.WriteLine("");
 
-        while (true)
+        config.OutputPath = Ask("Where should extracted files be saved?", Path.Combine(config.GamePath, "extracted"), true);
+        while (!PathHelpers.IsDirectoryWritable(config.OutputPath, out _))
         {
-            config.OutputPath = NormalizePath(Ask("Output folder", Path.Combine(AppContext.BaseDirectory, "output"), true), true);
-            if (IsValidPath(config.OutputPath) && IsDirectoryWritable(config.OutputPath)) break;
+            AnsiConsole.MarkupLine($"[red]Directory \"{config.OutputPath}\" is not writable: \"{Markup.Escape(config.OutputPath)}\"[/]");
+            config.OutputPath = Ask();
         }
+        AnsiConsole.WriteLine("");
 
         AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
         var detectedEngineVersion = DetectEngineVersion(config.GamePath);
@@ -100,34 +42,30 @@ public class ConfigService()
 
         AnsiConsole.MarkupLine("[blue]Use spaces to separate multiple values for the following prompts.[/]");
         AnsiConsole.MarkupLine("[blue]Some games require additional decryption or mapping files.[/]");
-        
-        // AES and mappings might be replaceable with a universal AES.txt and /mappings and just loading all; performance needs to be tested
+
         while (true)
         {
             config.AesKeys = Ask("AES keys", "0x...").Split(" ");
-            if (config.AesKeys.Length < 2 || config.AesKeys.All(k => IsValidAesKey(k))) break;
+            if (config.AesKeys.Length < 2 || config.AesKeys.All(k => PathHelpers.IsValidAesKey(k))) break;
         }
 
-        // validate paths
         config.MappingFiles = Ask(
                 "Paths to mapping files",
                 Path.Combine(".", "mappings", "MyGame.usmap")
             ).Split(" ");
 
-        // validate paths
         config.ExportPaths = Ask(
                 "Virtual paths to extract",
                 $"{Path.Combine("MyGame", "DataTables", ".*.uasset:json")} {Path.Combine("MyGame", "UI", ".*.uasset:png")}"
             ).Split(" ");
 
-        // validate paths
         config.ExcludePaths = Ask(
                 "Virtual paths to [bold]exclude[/]",
                 Path.Combine("MyGame", "UI", "UserInterface", ".*")
             ).Split(" ");
 
         var fileName = GetValidFileName(
-                Ask("Name your config file", GetValidFileName(config.ConfigTitle, ".json"), true), ".json");
+                Ask("Name your config file", GetValidFileName(config.ConfigTitle ?? "config", ".json"), true), ".json");
 
         var path = Path.Combine(ConfigsDirectory, fileName);
 
@@ -165,10 +103,8 @@ public class ConfigService()
         }
     }
 
-    // TODO: Validate other fields if provided
     public static ValidationResult ValidateConfig(ConfigObj config)
     {
-        // 1) GamePath must exist
         if (string.IsNullOrWhiteSpace(config.GamePath))
             return ValidationResult.Error("Missing game directory");
 
@@ -186,7 +122,6 @@ public class ConfigService()
         if (!Directory.Exists(gameDir))
             return ValidationResult.Error($"GamePath [gray]\"{gameDir}\"[/] does not exist");
 
-        // 2) OutputPath must be valid + creatable/writable
         if (string.IsNullOrWhiteSpace(config.OutputPath))
             return ValidationResult.Error("Missing output directory");
 
@@ -201,7 +136,6 @@ public class ConfigService()
             return ValidationResult.Error($"Output directory is not a valid path: {ex.Message}");
         }
 
-        // Attempt create directory
         try
         {
             Directory.CreateDirectory(outDir);
@@ -211,7 +145,6 @@ public class ConfigService()
             return ValidationResult.Error($"Output directory could not be created: [green]{outDir}[/]. {ex.Message}");
         }
 
-        // Verify we can write to it (create + delete a temp file)
         try
         {
             var testFile = Path.Combine(outDir, $".write_test_{Guid.NewGuid():N}.tmp");
@@ -223,7 +156,6 @@ public class ConfigService()
             return ValidationResult.Error($"Output directory is not writable: [green]{outDir}[/]. {ex.Message}");
         }
 
-        // Normalize cleaned paths back into config
         config.GamePath = gameDir;
         config.OutputPath = outDir;
 
@@ -265,7 +197,6 @@ public class ConfigService()
                 .UseConverter(option => option.Label)
                 .AddChoices(options));
 
-        // "Create new config"
         if (selectedOption.Config == null)
         {
             CreateConfig();
@@ -273,7 +204,7 @@ public class ConfigService()
         }
 
         AnsiConsole.Clear();
-        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(selectedOption.Config.ConfigTitle)}\" [dim]([underline]{Markup.Escape(Path.GetFileName(selectedOption.ConfigPath))}[/])[/][/]");
+        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(selectedOption.Config.ConfigTitle ?? "")}\" [dim]([underline]{Markup.Escape(Path.GetFileName(selectedOption.ConfigPath))}[/])[/][/]");
 
         return selectedOption.Config;
     }
@@ -286,11 +217,8 @@ public class ConfigService()
         {
             if (string.IsNullOrWhiteSpace(value))
                 return value;
-
-            // If contains whitespace or quotes, wrap in quotes and escape inner quotes
             if (value.Any(c => char.IsWhiteSpace(c) || c == '"'))
                 return $"\"{value.Replace("\"", "\\\"")}\"";
-
             return value;
         }
 
@@ -298,22 +226,18 @@ public class ConfigService()
         {
             if (string.IsNullOrWhiteSpace(value))
                 return;
-
             result += $"{flag} {QuoteIfNeeded(value)} ";
         }
 
         void AddMany(string flag, IEnumerable<string> values)
         {
             foreach (var value in values.Where(v => !string.IsNullOrWhiteSpace(v)))
-            {
                 Add(flag, value);
-            }
         }
 
         Add("-t", config.ConfigTitle);
         Add("-p", config.GamePath);
         Add("-o", config.OutputPath);
-
         AddMany("--aes", config.AesKeys ?? []);
         AddMany("--map", config.MappingFiles ?? []);
         AddMany("--export", config.ExportPaths ?? []);
@@ -325,31 +249,34 @@ public class ConfigService()
     // Helpers
     public static string GetValidFileName(string fileName, string? extension)
     {
-        // Only supports alphanumeric characters
         SlugHelper slugHelper = new SlugHelper();
         var safeFileName = slugHelper.GenerateSlug(fileName);
         if (!string.IsNullOrEmpty(extension) && !fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-        {
             safeFileName += extension;
-        }
         return safeFileName;
     }
 
-    static string Ask(string text, string hint, bool hintIsDefaultValue = false)
+    static string Ask(string? text = null, string hint = "", bool hintIsDefaultValue = false)
     {
-        if (!hintIsDefaultValue) text += $" [dim]({hint})[/]:";
-        var prompt = new TextPrompt<string>(text).AllowEmpty();
-        if (hintIsDefaultValue) prompt.DefaultValue(hint);
+        if (!string.IsNullOrEmpty(text))
+        {
+            if (!string.IsNullOrEmpty(hint))
+            {
+                string color = hintIsDefaultValue ? "green" : "dim";
+                text += $" [{color}]({hint})[/]:";
+            }
+            AnsiConsole.MarkupLine(text);
+        }
+
+        var prompt = new TextPrompt<string>(">").AllowEmpty();
+        if (hintIsDefaultValue) prompt.DefaultValue(hint).HideDefaultValue();
         return AnsiConsole.Prompt(prompt);
     }
 
-    // TODO: Try using ConfigTitle to find matching custom UE version in CUE4Parse
     static string? DetectEngineVersion(string GamePath)
     {
-
         static string? FindGameExe(string gameDir)
         {
-            // Prefer typical UE folder
             var binaries = Path.Combine(gameDir, "Binaries", "Win64");
             if (Directory.Exists(binaries))
             {
@@ -368,7 +295,6 @@ public class ConfigService()
                 if (anyExe != null) return anyExe.FullName;
             }
 
-            // Fallback: search a little wider but don't scan the entire disk
             var exes = Directory.EnumerateFiles(gameDir, "*.exe", SearchOption.AllDirectories)
                 .Where(p => p.Contains($"{Path.DirectorySeparatorChar}Binaries{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
                 .Select(p => new FileInfo(p))
@@ -389,13 +315,12 @@ public class ConfigService()
 
         var fvi = FileVersionInfo.GetVersionInfo(gameExePath);
 
-        // these seem to be identical
         string version = "";
         bool hasProductVersion = fvi.ProductMajorPart + fvi.ProductMinorPart > 0;
         bool hasFileVersion = fvi.FileMajorPart + fvi.FileMinorPart > 0;
 
         if (hasProductVersion) version = $"{fvi.ProductMajorPart}.{fvi.ProductMinorPart}";
-        if (hasFileVersion) version = $"{fvi.FileMajorPart}.{fvi.FileMinorPart}";
+        else if (hasFileVersion) version = $"{fvi.FileMajorPart}.{fvi.FileMinorPart}";
 
         if (!string.IsNullOrEmpty(version))
         {
@@ -406,85 +331,4 @@ public class ConfigService()
         AnsiConsole.WriteLine("[dim]Executable didn't contain version info[/]");
         return null;
     }
-
-    public static string NormalizePath(string path, bool allowEmpty = false)
-    {
-        if (!allowEmpty && string.IsNullOrWhiteSpace(path))
-            throw new ArgumentException("Path cannot be null or empty.");
-
-        // Trim whitespace and surrounding quotes
-        path = path.Trim().Trim('"');
-
-        // Expand environment variables (e.g. %LOCALAPPDATA%)
-        path = Environment.ExpandEnvironmentVariables(path);
-
-        try
-        {
-            // Convert relative paths to absolute based on current working directory
-            var fullPath = Path.GetFullPath(path);
-
-            // Optional: normalize directory separators
-            fullPath = Path.GetFullPath(new Uri(fullPath).LocalPath)
-                           .TrimEnd(Path.DirectorySeparatorChar);
-
-            return fullPath;
-        }
-        catch (Exception ex)
-        {
-            throw new ArgumentException($"Invalid path: {path}. {ex.Message}", ex);
-        }
-    }
-
-    // Allow blank path ("to be edited later") but reject invalid characters
-    public static bool IsValidPath(string path)
-    {
-        try
-        {
-            // TODO: Regex to test if the path that was normalized is valid (i.e. not C:\:::)
-            return true;
-        }
-        catch (ArgumentException ex)
-        {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
-        }
-        return false;
-    }
-
-    public static bool IsValidAesKey(string key, bool allowEmpty = false)
-    {
-        if (!allowEmpty && string.IsNullOrWhiteSpace(key))
-            return false;
-
-        key = key.Trim();
-
-        // For a more specific error message:
-        // Must be exactly 64 hex characters (256-bit key)
-        // if (key.Length != 64)
-        //     return false;
-
-        // Ensure only hex characters
-        return Regex.IsMatch(key, @"^0x[0-9a-fA-F]{64}$");
-    }
-
-    public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
-    {
-        try
-        {
-            using FileStream fs = File.Create(
-                Path.Combine(
-                    dirPath,
-                    Path.GetRandomFileName()
-                ),
-                1,
-                FileOptions.DeleteOnClose);
-            return true;
-        }
-        catch
-        {
-            if (throwIfFails)
-                throw;
-            else
-                return false;
-        }
-    }
-};
+}
