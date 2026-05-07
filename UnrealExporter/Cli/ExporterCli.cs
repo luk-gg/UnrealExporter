@@ -14,10 +14,10 @@ public class ExporterCli : Command<CliSettings>
             // Load config if provided
             if (!string.IsNullOrEmpty(settings.ConfigFile))
             {
-                var configFile = ConfigService.GetValidFileName(settings.ConfigFile, ".json");
+                var configFile = PathHelpers.GetValidFileName(settings.ConfigFile, ".json");
                 var configPath = Path.Combine(ConfigService.ConfigsDirectory, configFile);
                 config = ConfigService.LoadConfig(configPath);
-                AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(config.ConfigTitle ?? configFile)}\" [dim]([underline]{Markup.Escape(configFile)}[/])[/][/]");
+                AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(config.ConfigTitle)}\" [dim]([underline]{Markup.Escape(configFile)}[/])[/][/]");
             }
 
             // Append CLI arguments (overwrite config keys if collision)

@@ -1,6 +1,5 @@
 // Config/ConfigService.cs
 using Spectre.Console;
-using Slugify;
 using Newtonsoft.Json;
 using System.Diagnostics;
 
@@ -58,7 +57,7 @@ public class ConfigService
 
         AnsiConsole.MarkupLine("[blue]Some games require additional decryption or mapping files.[/]\n");
 
-
+        // TODO: Auto-detect AES key
         AnsiConsole.MarkupLine("Enter AES keys if needed [dim](0x...)[/]:");
         AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
         var aesKeys = new List<string>();
@@ -114,8 +113,15 @@ public class ConfigService
         AnsiConsole.WriteLine("");
 
 
-        var fileName = GetValidFileName(
-                Ask("Name your config file", GetValidFileName(config.ConfigTitle ?? "config", ".json"), true), ".json");
+        var fileName = PathHelpers.GetValidFileName(
+                Ask(
+                    "Name your config file",
+                    PathHelpers.GetValidFileName(config.ConfigTitle, ".json"),
+                    true
+                ),
+                ".json");
+
+        // TODO: Confirmation screen
 
         var path = Path.Combine(ConfigsDirectory, fileName);
 
@@ -254,7 +260,7 @@ public class ConfigService
         }
 
         AnsiConsole.Clear();
-        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(selectedOption.Config.ConfigTitle ?? "")}\" [dim]([underline]{Markup.Escape(Path.GetFileName(selectedOption.ConfigPath))}[/])[/][/]");
+        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(selectedOption.Config.ConfigTitle)}\" [dim]([underline]{Markup.Escape(Path.GetFileName(selectedOption.ConfigPath))}[/])[/][/]");
 
         return selectedOption.Config;
     }
@@ -297,14 +303,7 @@ public class ConfigService
     }
 
     // Helpers
-    public static string GetValidFileName(string fileName, string? extension)
-    {
-        SlugHelper slugHelper = new SlugHelper();
-        var safeFileName = slugHelper.GenerateSlug(fileName);
-        if (!string.IsNullOrEmpty(extension) && !fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-            safeFileName += extension;
-        return safeFileName;
-    }
+
 
     static string Ask(string? text = null, string hint = "", bool hintIsDefaultValue = false)
     {

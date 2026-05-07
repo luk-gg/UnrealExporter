@@ -1,5 +1,6 @@
 using Spectre.Console;
 using System.Text.RegularExpressions;
+using Slugify;
 
 public static class PathHelpers
 {
@@ -67,5 +68,14 @@ public static class PathHelpers
 
         if (created) Directory.Delete(dirPath);
         return true;
+    }
+
+    public static string GetValidFileName(string fileName, string? extension)
+    {
+        SlugHelper slugHelper = new SlugHelper();
+        var safeFileName = slugHelper.GenerateSlug(fileName);
+        if (!string.IsNullOrEmpty(extension) && !fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            safeFileName += extension;
+        return safeFileName;
     }
 }
