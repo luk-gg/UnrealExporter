@@ -1,0 +1,20 @@
+{
+  "ConfigTitle": "Palworld",
+  "GamePath": "C:/Program Files (x86)/Steam/steamapps/common/Palworld",
+  "OutputPath": "C:/Program Files (x86)/Steam/steamapps/common/Palworld/extracted",
+  "EngineVersion": "5.1",
+  "AesKeys": [],
+  "MappingFile": "Palworld.usmap",
+  "ExportPaths": [
+    "Pal/Content/Pal/Blueprint/Character/.*\\.uasset:json",
+    "Pal/Content/Pal/DataAsset/.*\\.uasset:json",
+    "Pal/Content/Pal/DataTable/.*\\.uasset:json",
+    "Pal/Content/Pal/Maps/.*\\.uasset:json",
+    "Pal/Content/Pal/Texture/.*\\.uasset:png",
+    "Pal/Content/L10N/.*\\.uasset:json"
+  ],
+  "ExcludePaths": [
+    "Pal/Content/Pal/Blueprint/MapObject/.*",
+    "Pal/Content/Pal/Blueprint/UI/UserInterface/MainMenu/.*"
+  ]
+}

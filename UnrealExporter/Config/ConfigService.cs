@@ -1,4 +1,3 @@
-// Config/ConfigService.cs
 using Spectre.Console;
 using Newtonsoft.Json;
 using System.Diagnostics;
@@ -26,34 +25,34 @@ public class ConfigService
         AnsiConsole.WriteLine("");
 
 
-        // config.GamePath = Ask("Where is the game folder?", Path.Combine("C:", "Program Files", "MyGame"));
-        // while (!Directory.Exists(config.GamePath))
-        // {
-        //     AnsiConsole.MarkupLine($"[red]Path \"{config.GamePath}\" does not exist.[/]");
-        //     config.GamePath = Ask();
-        // }
-        // AnsiConsole.WriteLine("");
+        config.GamePath = Ask("Where is the game folder?", Path.Combine("C:", "Program Files", "MyGame"));
+        while (!Directory.Exists(config.GamePath))
+        {
+            AnsiConsole.MarkupLine($"[red]Path \"{config.GamePath}\" does not exist.[/]");
+            config.GamePath = Ask();
+        }
+        AnsiConsole.WriteLine("");
 
 
-        // config.OutputPath = Ask("Where should extracted files be saved?", Path.Combine(config.GamePath, "extracted"), true);
-        // while (!PathHelpers.IsDirectoryWritable(config.OutputPath, out _))
-        // {
-        //     AnsiConsole.MarkupLine($"[red]Directory \"{config.OutputPath}\" is not writable.[/]");
-        //     config.OutputPath = Ask();
-        // }
-        // AnsiConsole.WriteLine("");
+        config.OutputPath = Ask("Where should extracted files be saved?", Path.Combine(config.GamePath, "extracted"), true);
+        while (!PathHelpers.IsDirectoryWritable(config.OutputPath, out _))
+        {
+            AnsiConsole.MarkupLine($"[red]Directory \"{config.OutputPath}\" is not writable.[/]");
+            config.OutputPath = Ask();
+        }
+        AnsiConsole.WriteLine("");
 
 
-        // AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
-        // var detectedEngineVersion = DetectEngineVersion(config.GamePath);
+        AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
+        var detectedEngineVersion = DetectEngineVersion(config.GamePath);
 
-        // config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrWhiteSpace(detectedEngineVersion));
-        // while (string.IsNullOrWhiteSpace(config.EngineVersion))
-        // {
-        //     AnsiConsole.MarkupLine($"[red]Unreal Engine version cannot be blank.[/]");
-        //     config.EngineVersion = Ask();
-        // }
-        // AnsiConsole.WriteLine("");
+        config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrWhiteSpace(detectedEngineVersion));
+        while (string.IsNullOrWhiteSpace(config.EngineVersion))
+        {
+            AnsiConsole.MarkupLine($"[red]Unreal Engine version cannot be blank.[/]");
+            config.EngineVersion = Ask();
+        }
+        AnsiConsole.WriteLine("");
 
 
         AnsiConsole.MarkupLine("[blue]Some games require decryption keys or mapping files.[/]\n");
@@ -63,16 +62,16 @@ public class ConfigService
             .Concat(LookupAesKeys(config.ConfigTitle, Path.Combine(AppContext.BaseDirectory, "olderkeys.txt")))
             .Distinct()
             .ToArray();
-            
+
         if (detectedKeys.Length > 0)
         {
             AnsiConsole.MarkupLine($"[blue]Found {detectedKeys.Length} AES keys for \"{config.ConfigTitle}\".[/]\n");
-            AnsiConsole.MarkupLine("Enter any additional AES keys if needed [dim](0x...)[/]:");
+            AnsiConsole.MarkupLine("If your game needs additional AES keys, enter them now [dim](0x...)[/]:");
         }
         else
         {
             AnsiConsole.MarkupLine($"[dim]No keys found for \"{config.ConfigTitle}\" in aes.txt and olderkeys.txt.[/]\n");
-            AnsiConsole.MarkupLine("Enter AES keys if needed [dim](0x...)[/]:");
+            AnsiConsole.MarkupLine("If your game needs AES keys, enter them now [dim](0x...)[/]:");
         }
 
         AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
@@ -91,68 +90,62 @@ public class ConfigService
         config.AesKeys = aesKeys.Distinct().ToArray();
         AnsiConsole.WriteLine("");
 
-        // // TODO: Scan mappings folder for a file name matching ConfigTitle
-        // AnsiConsole.MarkupLine($"Path to .usmap mapping file if needed [dim]({Path.Combine(".", "mappings", "MyGame.usmap")})[/]:");
-        // AnsiConsole.MarkupLine("[dim italic]Leave blank to skip[/]");
-        // config.MappingFile = Ask();
-        // while (!string.IsNullOrWhiteSpace(config.MappingFile) && !File.Exists(config.MappingFile))
-        // {
-        //     AnsiConsole.MarkupLine($"[red]File \"{config.MappingFile}\" not found.[/]");
-        //     config.MappingFile = Ask();
-        // }
-        // AnsiConsole.WriteLine("");
+        // TODO: Check if mapping file exists at start of extraction
+        AnsiConsole.MarkupLine($"If your game needs a mapping file, enter the name of the file, which should be placed in UnrealExporter/mappings [dim](MyGame.usmap)[/]:");
+        AnsiConsole.MarkupLine("[dim italic]Leave blank to skip[/]");
+        config.MappingFile = Ask();
+        AnsiConsole.WriteLine("");
 
 
-        // AnsiConsole.MarkupLine($"Virtual paths to extract and their output file types [dim]({Path.Combine("MyGame", "DataTables", ".*.uasset:json")}, {Path.Combine("MyGame", "UI", ".*.uasset:png")})[/]:");
-        // AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
-        // var exportPaths = new List<string>();
-        // while (true)
-        // {
-        //     var p = Ask();
-        //     if (string.IsNullOrWhiteSpace(p)) break;
-        //     exportPaths.Add(p);
-        // }
-        // config.ExportPaths = exportPaths.ToArray();
-        // AnsiConsole.WriteLine("");
+        AnsiConsole.MarkupLine($"Virtual paths to extract and their output file types [dim]({Path.Combine("MyGame", "DataTables", ".*.uasset:json")}, {Path.Combine("MyGame", "UI", ".*.uasset:png")})[/]:");
+        AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
+        var exportPaths = new List<string>();
+        while (true)
+        {
+            var p = Ask();
+            if (string.IsNullOrWhiteSpace(p)) break;
+            exportPaths.Add(p);
+        }
+        config.ExportPaths = exportPaths.ToArray();
+        AnsiConsole.WriteLine("");
 
 
-        // AnsiConsole.MarkupLine($"Virtual paths to [bold]exclude[/] [dim]({Path.Combine("MyGame", "UI", "UserInterface", ".*")})[/]:");
-        // AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
-        // var excludePaths = new List<string>();
-        // while (true)
-        // {
-        //     var p = Ask();
-        //     if (string.IsNullOrWhiteSpace(p)) break;
-        //     excludePaths.Add(p);
-        // }
-        // config.ExcludePaths = exportPaths.ToArray();
-        // AnsiConsole.WriteLine("");
+        AnsiConsole.MarkupLine($"Virtual paths to [bold]exclude[/] [dim]({Path.Combine("MyGame", "UI", "UserInterface", ".*")})[/]:");
+        AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
+        var excludePaths = new List<string>();
+        while (true)
+        {
+            var p = Ask();
+            if (string.IsNullOrWhiteSpace(p)) break;
+            excludePaths.Add(p);
+        }
+        config.ExcludePaths = exportPaths.ToArray();
+        AnsiConsole.WriteLine("");
 
 
-        // var fileName = PathHelpers.GetValidFileName(
-        //         Ask(
-        //             "Name your config file",
-        //             PathHelpers.GetValidFileName(config.ConfigTitle, ".json"),
-        //             true
-        //         ),
-        //         ".json");
+        var fileName = PathHelpers.GetValidFileName(
+                Ask(
+                    "Name your config file",
+                    PathHelpers.GetValidFileName(config.ConfigTitle, ".json"),
+                    true
+                ),
+                ".json");
 
-        // // TODO: Confirmation screen
 
-        // var path = Path.Combine(ConfigsDirectory, fileName);
+        var path = Path.Combine(ConfigsDirectory, fileName);
 
-        // var json = JsonConvert.SerializeObject(
-        //     config,
-        //     Formatting.Indented,
-        //     new JsonSerializerSettings
-        //     {
-        //         NullValueHandling = NullValueHandling.Ignore
-        //     });
+        var json = JsonConvert.SerializeObject(
+            config,
+            Formatting.Indented,
+            new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
 
-        // File.WriteAllText(path, json);
+        File.WriteAllText(path, json);
 
-        // AnsiConsole.Clear();
-        // AnsiConsole.MarkupLine($"[green]Added {config.ConfigTitle} [dim]({Markup.Escape(fileName)})[/][/]");
+        AnsiConsole.Clear();
+        AnsiConsole.MarkupLine($"[green]:check_mark: Added {config.ConfigTitle} [dim]([underline link={new Uri(path).AbsoluteUri}]{Markup.Escape(fileName)}[/])[/] to [underline link={new Uri(ConfigsDirectory).AbsoluteUri}]configs[/][/].\n");
     }
 
     public static ConfigObj LoadConfig(string path)
@@ -263,7 +256,7 @@ public class ConfigService
 
         var selectedOption = AnsiConsole.Prompt(
             new SelectionPrompt<SelectionOption>()
-                .Title("Select a config file or re-run unrealexporter with flags [dim](unrealexporter --help)[/] to begin extraction:")
+                .Title("Select a config file or re-run unrealexporter with flags [dim](see unrealexporter --help)[/] to begin extraction:")
                 .WrapAround()
                 .EnableSearch()
                 .UseConverter(option => option.Label)
@@ -276,7 +269,7 @@ public class ConfigService
         }
 
         AnsiConsole.Clear();
-        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(selectedOption.Config.ConfigTitle)}\" [dim]([underline]{Markup.Escape(Path.GetFileName(selectedOption.ConfigPath))}[/])[/][/]");
+        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config {Markup.Escape(config.ConfigTitle)} [dim]([underline link={new Uri(configPath).AbsoluteUri}]{Markup.Escape(configFile)}[/])[/][/]");
 
         return selectedOption.Config;
     }

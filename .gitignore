@@ -5,8 +5,9 @@
 .env
 /test
 **.ckpt
-/configs/**.json
-!config.json
+/UnrealExporter/configs/*.json
+!/UnrealExporter/configs/_*.json
+/UnrealExporter/mappings/*.usmap
 desktop.ini
 **.old
 .vscode

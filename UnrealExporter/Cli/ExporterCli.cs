@@ -17,7 +17,7 @@ public class ExporterCli : Command<CliSettings>
                 var configFile = PathHelpers.GetValidFileName(settings.ConfigFile, ".json");
                 var configPath = Path.Combine(ConfigService.ConfigsDirectory, configFile);
                 config = ConfigService.LoadConfig(configPath);
-                AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config \"{Markup.Escape(config.ConfigTitle)}\" [dim]([underline]{Markup.Escape(configFile)}[/])[/][/]");
+                AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config {Markup.Escape(config.ConfigTitle)} [dim]([underline link={new Uri(configPath).AbsoluteUri}]{Markup.Escape(configFile)}[/])[/][/]");
             }
 
             // Append CLI arguments (overwrite config keys if collision)
