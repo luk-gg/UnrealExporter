@@ -4,6 +4,8 @@ using Slugify;
 
 public static class PathHelpers
 {
+    public static string Slugify(string input) => new SlugHelper().GenerateSlug(input);
+
     public static string NormalizePath(string path, bool allowEmpty = false)
     {
         if (!allowEmpty && string.IsNullOrWhiteSpace(path))
@@ -25,6 +27,10 @@ public static class PathHelpers
         }
     }
 
+    // TODO: handle Base64? keys
+    // Blade & Soul Revolution (Android)   78aeb4da56eb4ab89ea2eb61abd6c5a3
+    // Sword Art Online: Fatal Bullet  h67GrjX2aGMgrAQeNwf9VmCYbt50ylJFeP3rIhbxh4e9bZXnqm8sbvEjWGOi6rgs
+    // Street Fighter V    _aS4mfZK8M5s5KWC2Lz2VsFnGKI7azgl
     public static bool IsValidAesKey(string key, bool allowEmpty = false)
     {
         if (!allowEmpty && string.IsNullOrWhiteSpace(key))

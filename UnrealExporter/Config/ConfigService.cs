@@ -2,6 +2,7 @@
 using Spectre.Console;
 using Newtonsoft.Json;
 using System.Diagnostics;
+using Slugify;
 
 public class ConfigService
 {
@@ -25,42 +26,57 @@ public class ConfigService
         AnsiConsole.WriteLine("");
 
 
-        config.GamePath = Ask("Where is the game folder?", Path.Combine("C:", "Program Files", "MyGame"));
-        while (!Directory.Exists(config.GamePath))
+        // config.GamePath = Ask("Where is the game folder?", Path.Combine("C:", "Program Files", "MyGame"));
+        // while (!Directory.Exists(config.GamePath))
+        // {
+        //     AnsiConsole.MarkupLine($"[red]Path \"{config.GamePath}\" does not exist.[/]");
+        //     config.GamePath = Ask();
+        // }
+        // AnsiConsole.WriteLine("");
+
+
+        // config.OutputPath = Ask("Where should extracted files be saved?", Path.Combine(config.GamePath, "extracted"), true);
+        // while (!PathHelpers.IsDirectoryWritable(config.OutputPath, out _))
+        // {
+        //     AnsiConsole.MarkupLine($"[red]Directory \"{config.OutputPath}\" is not writable.[/]");
+        //     config.OutputPath = Ask();
+        // }
+        // AnsiConsole.WriteLine("");
+
+
+        // AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
+        // var detectedEngineVersion = DetectEngineVersion(config.GamePath);
+
+        // config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrWhiteSpace(detectedEngineVersion));
+        // while (string.IsNullOrWhiteSpace(config.EngineVersion))
+        // {
+        //     AnsiConsole.MarkupLine($"[red]Unreal Engine version cannot be blank.[/]");
+        //     config.EngineVersion = Ask();
+        // }
+        // AnsiConsole.WriteLine("");
+
+
+        AnsiConsole.MarkupLine("[blue]Some games require decryption keys or mapping files.[/]\n");
+        AnsiConsole.MarkupLine($"[dim]Searching aes.txt and olderkeys.txt...[/]");
+        var detectedKeys =
+            LookupAesKeys(config.ConfigTitle, Path.Combine(AppContext.BaseDirectory, "aes.txt"))
+            .Concat(LookupAesKeys(config.ConfigTitle, Path.Combine(AppContext.BaseDirectory, "olderkeys.txt")))
+            .Distinct()
+            .ToArray();
+            
+        if (detectedKeys.Length > 0)
         {
-            AnsiConsole.MarkupLine($"[red]Path \"{config.GamePath}\" does not exist.[/]");
-            config.GamePath = Ask();
+            AnsiConsole.MarkupLine($"[blue]Found {detectedKeys.Length} AES keys for \"{config.ConfigTitle}\".[/]\n");
+            AnsiConsole.MarkupLine("Enter any additional AES keys if needed [dim](0x...)[/]:");
         }
-        AnsiConsole.WriteLine("");
-
-
-        config.OutputPath = Ask("Where should extracted files be saved?", Path.Combine(config.GamePath, "extracted"), true);
-        while (!PathHelpers.IsDirectoryWritable(config.OutputPath, out _))
+        else
         {
-            AnsiConsole.MarkupLine($"[red]Directory \"{config.OutputPath}\" is not writable.[/]");
-            config.OutputPath = Ask();
+            AnsiConsole.MarkupLine($"[dim]No keys found for \"{config.ConfigTitle}\" in aes.txt and olderkeys.txt.[/]\n");
+            AnsiConsole.MarkupLine("Enter AES keys if needed [dim](0x...)[/]:");
         }
-        AnsiConsole.WriteLine("");
 
-
-        AnsiConsole.MarkupLine("[dim]Attempting to auto-detect Unreal Engine version from the game's .exe file...[/]");
-        var detectedEngineVersion = DetectEngineVersion(config.GamePath);
-
-        config.EngineVersion = Ask("Unreal Engine Version", detectedEngineVersion ?? "5.1", !string.IsNullOrWhiteSpace(detectedEngineVersion));
-        while (string.IsNullOrWhiteSpace(config.EngineVersion))
-        {
-            AnsiConsole.MarkupLine($"[red]Unreal Engine version cannot be blank.[/]");
-            config.EngineVersion = Ask();
-        }
-        AnsiConsole.WriteLine("");
-
-
-        AnsiConsole.MarkupLine("[blue]Some games require additional decryption or mapping files.[/]\n");
-
-        // TODO: Auto-detect AES key
-        AnsiConsole.MarkupLine("Enter AES keys if needed [dim](0x...)[/]:");
         AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
-        var aesKeys = new List<string>();
+        var aesKeys = new List<string>(detectedKeys);
         while (true)
         {
             var key = Ask();
@@ -72,71 +88,71 @@ public class ConfigService
             }
             aesKeys.Add(key);
         }
-        config.AesKeys = aesKeys.ToArray();
+        config.AesKeys = aesKeys.Distinct().ToArray();
         AnsiConsole.WriteLine("");
 
-
-        AnsiConsole.MarkupLine($"Path to .usmap mapping file if needed [dim]({Path.Combine(".", "mappings", "MyGame.usmap")})[/]:");
-        AnsiConsole.MarkupLine("[dim italic]Leave blank to skip[/]");
-        config.MappingFile = Ask();
-        while (!string.IsNullOrWhiteSpace(config.MappingFile) && !File.Exists(config.MappingFile))
-        {
-            AnsiConsole.MarkupLine($"[red]File \"{config.MappingFile}\" not found.[/]");
-            config.MappingFile = Ask();
-        }
-        AnsiConsole.WriteLine("");
-
-
-        AnsiConsole.MarkupLine($"Virtual paths to extract and their output file types [dim]({Path.Combine("MyGame", "DataTables", ".*.uasset:json")}, {Path.Combine("MyGame", "UI", ".*.uasset:png")})[/]:");
-        AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
-        var exportPaths = new List<string>();
-        while (true)
-        {
-            var p = Ask();
-            if (string.IsNullOrWhiteSpace(p)) break;
-            exportPaths.Add(p);
-        }
-        config.ExportPaths = exportPaths.ToArray();
-        AnsiConsole.WriteLine("");
+        // // TODO: Scan mappings folder for a file name matching ConfigTitle
+        // AnsiConsole.MarkupLine($"Path to .usmap mapping file if needed [dim]({Path.Combine(".", "mappings", "MyGame.usmap")})[/]:");
+        // AnsiConsole.MarkupLine("[dim italic]Leave blank to skip[/]");
+        // config.MappingFile = Ask();
+        // while (!string.IsNullOrWhiteSpace(config.MappingFile) && !File.Exists(config.MappingFile))
+        // {
+        //     AnsiConsole.MarkupLine($"[red]File \"{config.MappingFile}\" not found.[/]");
+        //     config.MappingFile = Ask();
+        // }
+        // AnsiConsole.WriteLine("");
 
 
-        AnsiConsole.MarkupLine($"Virtual paths to [bold]exclude[/] [dim]({Path.Combine("MyGame", "UI", "UserInterface", ".*")})[/]:");
-        AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
-        var excludePaths = new List<string>();
-        while (true)
-        {
-            var p = Ask();
-            if (string.IsNullOrWhiteSpace(p)) break;
-            excludePaths.Add(p);
-        }
-        config.ExcludePaths = exportPaths.ToArray();
-        AnsiConsole.WriteLine("");
+        // AnsiConsole.MarkupLine($"Virtual paths to extract and their output file types [dim]({Path.Combine("MyGame", "DataTables", ".*.uasset:json")}, {Path.Combine("MyGame", "UI", ".*.uasset:png")})[/]:");
+        // AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
+        // var exportPaths = new List<string>();
+        // while (true)
+        // {
+        //     var p = Ask();
+        //     if (string.IsNullOrWhiteSpace(p)) break;
+        //     exportPaths.Add(p);
+        // }
+        // config.ExportPaths = exportPaths.ToArray();
+        // AnsiConsole.WriteLine("");
 
 
-        var fileName = PathHelpers.GetValidFileName(
-                Ask(
-                    "Name your config file",
-                    PathHelpers.GetValidFileName(config.ConfigTitle, ".json"),
-                    true
-                ),
-                ".json");
+        // AnsiConsole.MarkupLine($"Virtual paths to [bold]exclude[/] [dim]({Path.Combine("MyGame", "UI", "UserInterface", ".*")})[/]:");
+        // AnsiConsole.MarkupLine("[dim italic]One entry per line, leave blank to continue[/]");
+        // var excludePaths = new List<string>();
+        // while (true)
+        // {
+        //     var p = Ask();
+        //     if (string.IsNullOrWhiteSpace(p)) break;
+        //     excludePaths.Add(p);
+        // }
+        // config.ExcludePaths = exportPaths.ToArray();
+        // AnsiConsole.WriteLine("");
 
-        // TODO: Confirmation screen
 
-        var path = Path.Combine(ConfigsDirectory, fileName);
+        // var fileName = PathHelpers.GetValidFileName(
+        //         Ask(
+        //             "Name your config file",
+        //             PathHelpers.GetValidFileName(config.ConfigTitle, ".json"),
+        //             true
+        //         ),
+        //         ".json");
 
-        var json = JsonConvert.SerializeObject(
-            config,
-            Formatting.Indented,
-            new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore
-            });
+        // // TODO: Confirmation screen
 
-        File.WriteAllText(path, json);
+        // var path = Path.Combine(ConfigsDirectory, fileName);
 
-        AnsiConsole.Clear();
-        AnsiConsole.MarkupLine($"[green]Added {config.ConfigTitle} [dim]({Markup.Escape(fileName)})[/][/]");
+        // var json = JsonConvert.SerializeObject(
+        //     config,
+        //     Formatting.Indented,
+        //     new JsonSerializerSettings
+        //     {
+        //         NullValueHandling = NullValueHandling.Ignore
+        //     });
+
+        // File.WriteAllText(path, json);
+
+        // AnsiConsole.Clear();
+        // AnsiConsole.MarkupLine($"[green]Added {config.ConfigTitle} [dim]({Markup.Escape(fileName)})[/][/]");
     }
 
     public static ConfigObj LoadConfig(string path)
@@ -302,9 +318,6 @@ public class ConfigService
         return result.Trim();
     }
 
-    // Helpers
-
-
     static string Ask(string? text = null, string hint = "", bool hintIsDefaultValue = false)
     {
         if (!string.IsNullOrEmpty(text))
@@ -379,5 +392,27 @@ public class ConfigService
 
         AnsiConsole.WriteLine("[dim]Executable didn't contain version info.[/]\n");
         return null;
+    }
+
+    public static string[] LookupAesKeys(string configTitle, string keysFilePath)
+    {
+        if (!File.Exists(keysFilePath)) return [];
+
+        var slug = PathHelpers.Slugify(configTitle).ToLowerInvariant();
+
+        return File.ReadAllLines(keysFilePath)
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Select(l =>
+            {
+                var parts = l.Trim().Split("  ", StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2) return ((string name, string key)?)null;
+                var name = PathHelpers.Slugify(parts[0]).ToLowerInvariant();
+                var key = parts[^1].Trim();
+                return ((string name, string key)?)(name, key);
+            })
+            .Where(t => t != null && (t.Value.name.Contains(slug) || slug.Contains(t.Value.name)))
+            .Where(t => PathHelpers.IsValidAesKey(t!.Value.key))
+            .Select(t => t!.Value.key)
+            .ToArray();
     }
 }

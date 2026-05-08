@@ -21,4 +21,13 @@
     <ProjectReference Include="..\CUE4Parse\CUE4Parse\CUE4Parse.csproj" />
     <ProjectReference Include="..\CUE4Parse\CUE4Parse-Conversion\CUE4Parse-Conversion.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="aes.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="olderkeys.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
