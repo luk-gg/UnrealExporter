@@ -28,7 +28,7 @@ public sealed class CliSettings : CommandSettings
     public string[] AesKeys { get; set; } = [];
 
     [CommandOption("--map")]
-    [Description("Path to mapping file (.usmap)")]
+    [Description("Name of .usmap file in /mappings")]
     public string MappingFile { get; set; } = "";
 
     [CommandOption("-e|--export")]

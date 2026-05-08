@@ -17,7 +17,6 @@ public class ExporterCli : Command<CliSettings>
                 var configFile = PathHelpers.GetValidFileName(settings.ConfigFile, ".json");
                 var configPath = Path.Combine(ConfigService.ConfigsDirectory, configFile);
                 config = ConfigService.LoadConfig(configPath);
-                AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config {Markup.Escape(config.ConfigTitle)} [dim]([underline link={new Uri(configPath).AbsoluteUri}]{Markup.Escape(configFile)}[/])[/][/]");
             }
 
             // Append CLI arguments (overwrite config keys if collision)
@@ -26,7 +25,7 @@ public class ExporterCli : Command<CliSettings>
         else
         {
             // No args: interactive mode
-            AnsiConsole.MarkupLine("[bold hotpink]Welcome to [link=https://github.com/luk-gg/unrealexporter]UnrealExporter[/], a simple data extraction CLI for Unreal Engine games![/]\n");
+            AnsiConsole.MarkupLine("[bold hotpink]Welcome to [underline link=https://github.com/luk-gg/unrealexporter]UnrealExporter[/], a simple data extraction CLI for Unreal Engine games![/]\n");
             config = ConfigService.PromptConfigSelection();
         }
 

@@ -242,6 +242,7 @@ public class ConfigService
                 var config = LoadConfig(path);
                 if (config is null) continue;
                 var fileName = Path.GetFileName(path);
+                if (fileName.StartsWith('_')) continue;
                 options.Add(new SelectionOption
                 {
                     Label = $"{config.ConfigTitle} [dim]({fileName})[/]",
@@ -267,9 +268,6 @@ public class ConfigService
             CreateConfig();
             return PromptConfigSelection();
         }
-
-        AnsiConsole.Clear();
-        AnsiConsole.MarkupLine($"[green]:check_mark: Loaded config {Markup.Escape(config.ConfigTitle)} [dim]([underline link={new Uri(configPath).AbsoluteUri}]{Markup.Escape(configFile)}[/])[/][/]");
 
         return selectedOption.Config;
     }
@@ -308,7 +306,7 @@ public class ConfigService
         AddMany("--export", config.ExportPaths ?? []);
         AddMany("--exclude", config.ExcludePaths ?? []);
 
-        return result.Trim();
+        return Markup.Escape(result.Trim());
     }
 
     static string Ask(string? text = null, string hint = "", bool hintIsDefaultValue = false)

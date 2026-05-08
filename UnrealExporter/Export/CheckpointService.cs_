@@ -1,0 +1,83 @@
+using Newtonsoft.Json;
+using System.Collections.Concurrent;
+
+public class CheckpointService
+{
+
+    private string UseCheckpointFile { get; } = "";
+
+    private static bool useCheckpoint = false;
+
+    public static Dictionary<string, long> LoadCheckpoint(ConfigObj config)
+    {
+        if (UseCheckpointFile?.Length > 0)
+        {
+            string checkpointPath = $"{AppContext.BaseDirectory}\\{UseCheckpointFile}";
+            if (UseCheckpointFile.Equals("latest"))
+            {
+                string[] allCheckpointPaths = Directory.GetFiles($"{AppContext.BaseDirectory}\\checkpoints");
+                var pathsForGameTitle = allCheckpointPaths.Where(path => path.Contains(config.ConfigTitle));
+
+                if (!pathsForGameTitle.Any())
+                {
+                    Console.WriteLine($"ERROR: could not find any checkpoints for \"{config.ConfigTitle}\". Ignoring...");
+                    return [];
+                }
+
+                var sortedPaths = pathsForGameTitle.OrderBy(path =>
+                {
+                    string dateTimeFromFileName = path.Split(Path.DirectorySeparatorChar).Last().Split(".").First().SubstringAfter(config.ConfigTitle)[1..];
+                    string date = dateTimeFromFileName.Split(" ")[0];
+                    string time = dateTimeFromFileName.Split(" ")[1].Replace("-", ":");
+                    double unixTime = DateTime.Parse($"{date} {time}").Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+                    return unixTime;
+                });
+
+                var latestCheckpointPath = sortedPaths.Last();
+
+                if (File.Exists(latestCheckpointPath))
+                {
+                    useCheckpoint = true;
+                    Console.WriteLine($"Using checkpoint: latest ({latestCheckpointPath.Split(Path.DirectorySeparatorChar).Last()})");
+                    var fromFile = File.ReadAllText(latestCheckpointPath);
+                    var loadedCheckpoint = JsonConvert.DeserializeObject<Dictionary<string, long>>(fromFile);
+                    return loadedCheckpoint ?? [];
+                }
+
+                return [];
+            }
+            else if (File.Exists(checkpointPath))
+            {
+                useCheckpoint = true;
+                Console.WriteLine($"Using checkpoint: {UseCheckpointFile}");
+                var fromFile = File.ReadAllText(checkpointPath);
+                var loadedCheckpoint = JsonConvert.DeserializeObject<Dictionary<string, long>>(fromFile);
+                return loadedCheckpoint ?? [];
+            }
+            else
+            {
+                Console.WriteLine($"ERROR: checkpoint file at location \"{UseCheckpointFile}\" does not exist. Ignoring...");
+                return [];
+            }
+        }
+        else
+        {
+            Console.WriteLine($"No checkpoint file selected. Ignoring...");
+            return [];
+        }
+    }
+
+    public static void CreateCheckpoint(ConcurrentDictionary<string, long> newCheckpointDict, ConfigObj config)
+    {
+        Console.WriteLine();
+        var newCheckpointJson = JsonConvert.SerializeObject(newCheckpointDict, Formatting.Indented);
+        var dateStamp = DateTime.Now.ToString("MM-dd-yyyy HH-mm");
+        string checkpointsDirPath = $"{AppContext.BaseDirectory}\\checkpoints";
+        if (!Directory.Exists(checkpointsDirPath))
+        {
+            Directory.CreateDirectory(checkpointsDirPath);
+        }
+        File.WriteAllText($"./checkpoints/{config.ConfigTitle} {dateStamp}.ckpt", newCheckpointJson);
+        Console.WriteLine($"Created checkpoint file: ./checkpoints/{config.ConfigTitle} {dateStamp}.ckpt");
+    }
+}

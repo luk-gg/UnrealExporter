@@ -33,22 +33,11 @@ public class UnrealExporter
             conf.SetApplicationName("unrealexporter");
             conf.SetExceptionHandler((ex, resolver) =>
             {
-                AnsiConsole.MarkupLine(ex.Message);
-                // AnsiConsole.MarkupLine($"[bold red][[Error]][/] {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Error: {ex.Message}[/]");
                 return -1;
             });
         });
 
         cli.Run(args);
-    }
-
-    public static double Now()
-    {
-        return DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds;
-    }
-
-    public static string Elapsed(double start, double end, int factor = 1)
-    {
-        return ((end - start) / factor).ToString("0.00");
     }
 }
