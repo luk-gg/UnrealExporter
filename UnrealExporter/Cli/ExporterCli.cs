@@ -6,7 +6,7 @@ public class ExporterCli : Command<CliSettings>
 {
     public override int Execute(CommandContext context, CliSettings settings, CancellationToken cancellation)
     {
-        // AnsiConsole.Clear();
+        AnsiConsole.Clear();
         ConfigObj config = new();
 
         if (Environment.GetCommandLineArgs().Length > 1)
@@ -29,7 +29,31 @@ public class ExporterCli : Command<CliSettings>
             config = ConfigService.PromptConfigSelection();
         }
 
+        // TODO: check if valid config/sufficient args
+        
+#if DEBUG
         AnsiConsole.MarkupLine($"[dim]unrealexporter {ConfigService.StringifyConfig(config)}[/]");
+#endif
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[dim]Setting[/]").NoWrap())
+            .AddColumn("[dim]Value[/]");
+
+        table.AddRow("Title", Markup.Escape(config.ConfigTitle ?? ""));
+        table.AddRow("Game path", Markup.Escape(config.GamePath));
+        table.AddRow("Output path", Markup.Escape(config.OutputPath));
+        table.AddRow("Engine version", Markup.Escape(config.EngineVersion));
+        table.AddRow("AES keys", config.AesKeys.Length > 0 ? string.Join("\n", config.AesKeys.Select(k => Markup.Escape(k))) : "[dim]none[/]");
+        table.AddRow("Mapping file", string.IsNullOrEmpty(config.MappingFile) ? "[dim]none[/]" : Markup.Escape(config.MappingFile));
+        table.AddRow("Export paths", config.ExportPaths.Length > 0 ? string.Join("\n", config.ExportPaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
+        table.AddRow("Exclude paths", config.ExcludePaths.Length > 0 ? string.Join("\n", config.ExcludePaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
+
+        AnsiConsole.Write(table);
+
+        ExportService.InitExporter(config);
+
         return 0;
     }
 

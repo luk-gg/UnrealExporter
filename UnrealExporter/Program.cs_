@@ -32,59 +32,7 @@ public class UnrealExporter
     public static void Main(string[] args)
     {
 
-#if DEBUG
-        // During development (dotnet run), BaseDirectory is bin\Debug\net8.0
-        // Adjust to project root
-        RootDir = Path.GetFullPath(Path.Combine(RootDir, @"..\..\..\.."));
-#endif
 
-        // For Oodle to work from outside of project directory
-        Directory.SetCurrentDirectory(RootDir);
-
-        double trueStart = Now();
-
-        // Initialize CUE4Parse dependencies
-        InitOodle();
-        InitZlib();
-
-        try
-        {
-            List<ConfigObj> configs = LoadAllConfigs(args);
-
-            foreach (ConfigObj config in configs)
-            {
-                double start = Now();
-                totalChangedFiles = 0;
-                totalRegexMatches = 0;
-                totalExportedFiles = 0;
-
-                EGame selectedVersion = GetGameVersion(config.Version);
-                Console.WriteLine($"Config: {config.ConfigFileName} (object #{config.ConfigObjectIndex + 1})");
-                Console.WriteLine($"Game: {config.ConfigTitle}");
-                Console.WriteLine($"Version: {selectedVersion}");
-                Console.WriteLine($"Locale: {language}");
-                Console.WriteLine($"Paks: {config.GamePath}");
-                Console.WriteLine($"Output: {config.OutputDir}");
-                Console.WriteLine($"AES key: {config.Aes}");
-                Console.WriteLine($"Log outputs: {config.LogOutputs}");
-                Console.WriteLine($"Keep directory structure: {config.KeepDirectoryStructure}");
-                Console.WriteLine($"Create new checkpoint: {createNewCheckpoint}");
-
-                // Load CUE4Parse and export files
-                AbstractFileProvider provider = CreateProvider(config, selectedVersion);
-                Export(provider, config, start);
-            }
-
-            Console.WriteLine($"UnrealExporter finished in {Elapsed(trueStart, Now(), 1000)} seconds");
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine("\nExiting UnrealExporter.");
-        }
-        catch (FileNotFoundException)
-        {
-            Console.WriteLine($"ERROR: no config files found.");
-        }
     }
 
 }
