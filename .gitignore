@@ -12,7 +12,3 @@ desktop.ini
 !/UnrealExporter/configs/_*.json
 /UnrealExporter/mappings/*.usmap
 **.ckpt
-
-oodle-data-shared.dll
-oo2core_9_win64.dll
-zlib-ng2.dll
