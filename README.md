@@ -138,3 +138,14 @@ The exporter should now be able to detect the game files.
 
 ### How to fix no files loading due to incorrect AES key
 If you have the wrong AES key, refer to [this guide](https://github.com/Cracko298/UE4-AES-Key-Extracting-Guide) or [this tool (untested)](https://github.com/mmozeiko/aes-finder) to get the correct key.
+
+
+
+
+
+<!-- Patch pak reconciliation test: -->
+<!-- you can check SEVEN_Product/Content/Product/DataTable/DT_PassiveSkillData.uasset -->
+<!-- UCR004_FlightMaster (leafa passive) m_strength should be 25.0 not 10.0 -->
+
+<!-- Zlib dll can be checked with ToF global -->
+<!-- Detex dll can be checked with SAOFD "SEVEN_Product/Content/Product/UI/Texture/Common/ButtonWindowBase/.*\\.uasset:png" -->

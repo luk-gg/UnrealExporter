@@ -1,3 +1,4 @@
+using CUE4Parse.Compression;
 using CUE4Parse.Encryption.Aes;
 using CUE4Parse.FileProvider;
 using CUE4Parse.FileProvider.Objects;
@@ -9,15 +10,15 @@ using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
 using CUE4Parse.Utils;
 using CUE4Parse_Conversion.Textures;
-using Newtonsoft.Json;
+using CUE4Parse_Conversion.Textures.BC;
 using JSBeautifyLib;
-using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 using Spectre.Console;
-using CUE4Parse.Compression;
+using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
 
 record ExportMatch(string OutputType);
 
-// TODO: check if DefaultFileProvider actually does reconcile patch paks correctly.
 public class ExportService
 {
     private static string outputBaseDir = "";
@@ -26,29 +27,24 @@ public class ExportService
 
     private static int totalExportedFiles = 0;
 
-    // public static async ValueTask InitZlib()
-    // {
-    //     var zlibPath = Path.Combine(".", ZlibHelper.DLL_NAME);
-    //     if (!File.Exists(zlibPath))
-    //     {
-    //         await ZlibHelper.DownloadDllAsync(zlibPath);
-    //     }
-
-    //     ZlibHelper.Initialize(zlibPath);
-    // }
-
     readonly static object _refreshLock = new();
 
-    public static async Task InitExporter(ConfigObj config)
+    private static ConcurrentBag<string> errors = [];
+
+    public static void InitExporter(ConfigObj config)
     {
         try
         {
-            await OodleHelper.InitializeAsync();
+            OodleHelper.Initialize(Path.Combine(AppContext.BaseDirectory, OodleHelper.OODLE_NAME_CURRENT));
+            ZlibHelper.Initialize(Path.Combine(AppContext.BaseDirectory, ZlibHelper.DLL_NAME));
+            DetexHelper.LoadDll(Path.Combine(AppContext.BaseDirectory, DetexHelper.DLL_NAME));
+            DetexHelper.Initialize(Path.Combine(AppContext.BaseDirectory, DetexHelper.DLL_NAME));
             AbstractFileProvider provider = CreateProvider(config);
 
             double start = TimeHelpers.Now();
             totalRegexMatches = 0;
             totalExportedFiles = 0;
+            errors = [];
             outputBaseDir = config.OutputPath;
 
             var totalFiles = provider.Files.Count;
@@ -72,7 +68,7 @@ public class ExportService
                         lock (_refreshLock)
                         {
                             // Refresh every 1%
-                            if (processed % (totalFiles / 100) == 0 || processed == totalFiles)
+                            if (processed % (totalFiles / 100) == 0 || processed >= totalFiles - (totalFiles / 100))
                             {
                                 var pct = (double)processed / totalFiles;
                                 var filled = (int)(pct * 40);
@@ -89,6 +85,7 @@ public class ExportService
                         }
                     }
 
+                    // Main export loop
                     Parallel.ForEach(provider.Files, file =>
                     {
                         try
@@ -106,15 +103,26 @@ public class ExportService
                             Interlocked.Increment(ref processed);
                             Refresh();
                         }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine($"ERROR: {file.Value.Path} — {e.Message}");
-                        }
+                        catch (AggregateException ae) { errors.Add($"{file.Value.Path} — {ae.Message}"); }
+                        catch (Exception e) { errors.Add($"{file.Value.Path} — {e.Message}"); }
 
                     });
                 });
 
-            AnsiConsole.MarkupLine($"\n[blue]:check_mark: UnrealExporter finished in {TimeHelpers.TimeSince(start)}[/]");
+            string emoji = "[green]:check_mark:[/]";
+            string errorTotal = "[green]0[/] errors";
+
+            if (!errors.IsEmpty)
+            {
+                Console.WriteLine();
+                emoji = "[yellow]:warning:[/]";
+                errorTotal = $"[red]{errors.Count}[/] errors (see above)";
+                foreach (var error in errors)
+                    AnsiConsole.MarkupLine($"[dim red]{Markup.Escape(error)}[/]");
+            }
+
+            AnsiConsole.MarkupLine($"\n{emoji} UnrealExporter finished in [blue]{TimeHelpers.TimeSince(start)}[/] with {errorTotal} [dim](outputted to [underline link={new Uri(outputBaseDir).AbsoluteUri}]{outputBaseDir}[/])[/]");
+
         }
         catch (OperationCanceledException)
         {
@@ -152,10 +160,6 @@ public class ExportService
 
         string usmapPath = $"{AppContext.BaseDirectory}\\mappings\\{config.MappingFile}";
         if (File.Exists(usmapPath)) provider.MappingsContainer = new FileUsmapTypeMappingsProvider(usmapPath);
-
-        // Load files into PatchFileProvider so the patch uassets override original uassets
-        // var patchProvider = new PatchFileProvider();
-        // patchProvider.Load(provider);
 
         return provider;
     }
