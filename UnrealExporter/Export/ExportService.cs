@@ -55,7 +55,7 @@ public class ExportService
             int processed = 0;
             string currentFile = "";
 
-            AnsiConsole.MarkupLine($"\n[blue]Found {totalFiles:N0} files.[/]\n");
+            AnsiConsole.MarkupLine($"\nFound {totalFiles:N0} files.\n");
 
             var table = new Table()
                 .HideHeaders()
@@ -77,20 +77,12 @@ public class ExportService
                                 var pct = (double)processed / totalFiles;
                                 var filled = (int)(pct * 40);
                                 var bar = $"[green]{new string('━', filled)}[/][grey]{new string('━', 40 - filled)}[/]";
-
-                                var elapsed = TimeHelpers.Now() - start;
-                                var rate = processed / elapsed; // files per ms
-                                var remainingMs = pct < 0.10 ? -1 : (totalFiles - processed) / rate;
-                                var eta = remainingMs < 0 ? "Calculating..." : TimeHelpers.FormatMs(remainingMs);
-
-                                var stats = $"Matched [blue]{totalRegexMatches}[/]  Exported [blue]{totalExportedFiles}[/]  ETA [blue]{eta}[/]  Elapsed [blue]{TimeHelpers.TimeSince(start)}[/]";
-
+                                var stats = $"Matched [blue]{totalRegexMatches}[/]  Exported [blue]{totalExportedFiles}[/]  Elapsed [blue]{TimeHelpers.TimeSince(start)}[/]";
                                 if (processed == totalFiles) stats = "[dim]" + stats + "[/]";
 
                                 table.Rows.Clear();
                                 table.AddRow(new Markup($"[dim]{Markup.Escape(currentFile)}[/]"));
-                                table.AddRow(new Markup($"{bar} [green]{Math.Round(pct * 100)}%[/]"));
-                                table.AddRow(new Markup(""));
+                                table.AddRow(new Markup($"{bar} [green]{Math.Round(pct * 100)}%[/]\n"));
                                 table.AddRow(new Markup(stats));
                                 ctx.Refresh();
                             }
