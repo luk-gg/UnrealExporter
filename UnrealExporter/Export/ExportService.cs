@@ -1,46 +1,132 @@
-using CUE4Parse.FileProvider;
-using CUE4Parse.UE4.Versions;
 using CUE4Parse.Encryption.Aes;
-using CUE4Parse.UE4.Objects.Core.Misc;
-using CUE4Parse.UE4.Assets.Exports.Texture;
-using CUE4Parse_Conversion.Textures;
-using CUE4Parse.UE4.Localization;
+using CUE4Parse.FileProvider;
+using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.MappingsProvider;
+using CUE4Parse.UE4.Assets.Exports;
+using CUE4Parse.UE4.Assets.Exports.Texture;
+using CUE4Parse.UE4.Localization;
+using CUE4Parse.UE4.Objects.Core.Misc;
+using CUE4Parse.UE4.Versions;
 using CUE4Parse.Utils;
-using SkiaSharp;
+using CUE4Parse_Conversion.Textures;
 using Newtonsoft.Json;
 using JSBeautifyLib;
 using System.Text.RegularExpressions;
-using System.Collections.Concurrent;
-using System.Globalization;
-using CUE4Parse.FileProvider.Objects;
+using Spectre.Console;
+using CUE4Parse.Compression;
 
 record ExportMatch(string OutputType);
 
 // TODO: check if DefaultFileProvider actually does reconcile patch paks correctly.
 public class ExportService
 {
-    private static bool createNewCheckpoint { get; } = false;
-    private static string language { get; } = "English";
+    private static string outputBaseDir = "";
 
     private static int totalRegexMatches = 0;
+
     private static int totalExportedFiles = 0;
 
-    public static void InitExporter(ConfigObj config)
+    // public static async ValueTask InitZlib()
+    // {
+    //     var zlibPath = Path.Combine(".", ZlibHelper.DLL_NAME);
+    //     if (!File.Exists(zlibPath))
+    //     {
+    //         await ZlibHelper.DownloadDllAsync(zlibPath);
+    //     }
+
+    //     ZlibHelper.Initialize(zlibPath);
+    // }
+
+    readonly static object _refreshLock = new();
+
+    public static async Task InitExporter(ConfigObj config)
     {
         try
         {
-            InitService.InitOodle();
+            await OodleHelper.InitializeAsync();
             AbstractFileProvider provider = CreateProvider(config);
-            ExportFiles(provider, config);
+
+            double start = TimeHelpers.Now();
+            totalRegexMatches = 0;
+            totalExportedFiles = 0;
+            outputBaseDir = config.OutputPath;
+
+            var totalFiles = provider.Files.Count;
+            int processed = 0;
+            string currentFile = "";
+
+            AnsiConsole.MarkupLine($"\n[blue]Found {totalFiles:N0} files.[/]\n");
+
+            var table = new Table()
+                .HideHeaders()
+                .Border(TableBorder.None)
+                .AddColumn(new TableColumn("").NoWrap());
+
+            AnsiConsole.Live(table)
+                .AutoClear(false)
+                .Overflow(VerticalOverflow.Ellipsis)
+                .Start(ctx =>
+                {
+                    void Refresh()
+                    {
+                        lock (_refreshLock)
+                        {
+                            // Refresh every 1%
+                            if (processed % (totalFiles / 100) == 0 || processed == totalFiles)
+                            {
+                                var pct = (double)processed / totalFiles;
+                                var filled = (int)(pct * 40);
+                                var bar = $"[green]{new string('━', filled)}[/][grey]{new string('━', 40 - filled)}[/]";
+
+                                var elapsed = TimeHelpers.Now() - start;
+                                var rate = processed / elapsed; // files per ms
+                                var remainingMs = pct < 0.10 ? -1 : (totalFiles - processed) / rate;
+                                var eta = remainingMs < 0 ? "Calculating..." : TimeHelpers.FormatMs(remainingMs);
+
+                                var stats = $"Matched [blue]{totalRegexMatches}[/]  Exported [blue]{totalExportedFiles}[/]  ETA [blue]{eta}[/]  Elapsed [blue]{TimeHelpers.TimeSince(start)}[/]";
+
+                                if (processed == totalFiles) stats = "[dim]" + stats + "[/]";
+
+                                table.Rows.Clear();
+                                table.AddRow(new Markup($"[dim]{Markup.Escape(currentFile)}[/]"));
+                                table.AddRow(new Markup($"{bar} [green]{Math.Round(pct * 100)}%[/]"));
+                                table.AddRow(new Markup(""));
+                                table.AddRow(new Markup(stats));
+                                ctx.Refresh();
+                            }
+                        }
+                    }
+
+                    Parallel.ForEach(provider.Files, file =>
+                    {
+                        try
+                        {
+                            var match = GetRegexMatch(file.Value.Path, config);
+                            if (match != null && !IsExcluded(file.Value.Path, config))
+                            {
+                                currentFile = file.Value.Path;
+                                Interlocked.Increment(ref totalRegexMatches);
+
+                                try { ExportFile(provider, file.Value, match.OutputType); }
+                                catch (AggregateException ae) { Console.WriteLine(ae.Message); }
+                            }
+
+                            Interlocked.Increment(ref processed);
+                            Refresh();
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine($"ERROR: {file.Value.Path} — {e.Message}");
+                        }
+
+                    });
+                });
+
+            AnsiConsole.MarkupLine($"\n[blue]:check_mark: UnrealExporter finished in {TimeHelpers.TimeSince(start)}[/]");
         }
         catch (OperationCanceledException)
         {
             Console.WriteLine("\nExiting UnrealExporter.");
-        }
-        catch (FileNotFoundException)
-        {
-            Console.WriteLine($"ERROR: no config files found.");
         }
     }
 
@@ -82,48 +168,9 @@ public class ExportService
         return provider;
     }
 
-    public static void ExportFiles(AbstractFileProvider provider, ConfigObj config)
-    {
-        double start = TimeHelpers.Now();
-        totalRegexMatches = 0;
-        totalExportedFiles = 0;
-        // int totalChangedFiles = 0;
-        // bool useCheckpoint = false;
-        // Dictionary<string, long> loadedCheckpoint = CheckpointService.LoadCheckpoint(config);
-        // ConcurrentDictionary<string, long> newCheckpointDict = [];
-
-        Console.WriteLine($"Scanning {provider.Files.Count} files...{Environment.NewLine}");
-
-        Parallel.ForEach(provider.Files, file =>
-        {
-            var match = GetRegexMatch(file.Value.Path, config);
-            if (match == null || IsExcluded(file.Value.Path, config)) return;
-            Interlocked.Increment(ref totalRegexMatches);
-            string outputPath = Path.Combine(config.OutputPath, Path.GetDirectoryName(file.Value.Path)!, Path.GetFileNameWithoutExtension(file.Value.Path));
-
-            try
-            {
-                ExportFile(provider, file.Value, outputPath, match.OutputType);
-            }
-            catch (AggregateException ae)
-            {
-                Console.WriteLine(ae.Message);
-            }
-        });
-
-        // Create checkpoint
-        // if (createNewCheckpoint) CheckpointService.CreateCheckpoint(newCheckpointDict, config);
-
-        // Log results
-        // if (logOutputs && totalExportedFiles > 0 && !createNewCheckpoint) Console.WriteLine();
-        // Console.WriteLine($"Scanned {provider.Files.Count} files{(useCheckpoint ? $" ({totalChangedFiles} changed, {provider.Files.Count - totalChangedFiles} unchanged)" : "")}");
-        Console.WriteLine($"Regex matched {totalRegexMatches} files {(totalRegexMatches > totalExportedFiles ? $"(skipped {totalRegexMatches - totalExportedFiles} incompatible file types)" : "")}");
-        Console.WriteLine($"Exported {totalExportedFiles} files in {TimeHelpers.Elapsed(start, TimeHelpers.Now(), 1000)} seconds");
-        Console.WriteLine();
-    }
-
     static ExportMatch? GetRegexMatch(string filePath, ConfigObj config) =>
         config.ExportPaths
+            .Where(p => p.Contains(':'))
             .Select(p => new { Pattern = p[..p.LastIndexOf(':')], OutputType = p.SubstringAfterLast(':') })
             .FirstOrDefault(p => Regex.IsMatch(filePath, "^" + p.Pattern + "$", RegexOptions.IgnoreCase))
             is { } match ? new ExportMatch(match.OutputType.ToLower()) : null;
@@ -131,137 +178,121 @@ public class ExportService
     static bool IsExcluded(string filePath, ConfigObj config) =>
         config.ExcludePaths.Any(p => Regex.IsMatch(filePath, "^" + p + "$", RegexOptions.IgnoreCase));
 
-    static void ExportFile(AbstractFileProvider provider, GameFile file, string outputPath, string outputType)
+    static void ExportFile(AbstractFileProvider provider, GameFile file, string outputType)
     {
-        var fileType = file.Path.SubstringAfterLast('.').ToLower();
+        var originalType = file.Path.SubstringAfterLast('.').ToLower();
 
-        switch (fileType)
+        switch (originalType)
         {
             case "uasset":
             case "umap":
-                ExportUasset(provider, file, outputPath, outputType);
-                break;
+                {
+                    var allObjects = provider.LoadPackageObjects(file.Path);
+
+                    if (outputType == "json")
+                        SerializeAndExportJson(allObjects, file);
+                    else if (outputType == "png")
+                        ExportPng(allObjects, file);
+
+                    break;
+                }
+
             case "locres":
-                ExportLocres(provider, file, outputPath, outputType);
-                break;
-            case "js":
-                ExportJs(provider, file, outputPath, outputType);
-                break;
-            case "db":
-                ExportDb(provider, file, outputPath, outputType);
-                break;
-        }
-    }
-
-    static void ExportUasset(AbstractFileProvider provider, GameFile file, string outputPath, string outputType)
-    {
-        var allObjects = provider.LoadPackage(file.Path).GetExports();
-        switch (outputType)
-        {
-            case "png":
-                foreach (var obj in allObjects)
                 {
-                    // Only exports the first object that is a valid bitmap
-                    if (obj is UTexture2D texture)
-                    {
-                        var bitmap = texture.Decode(ETexturePlatform.DesktopMobile);
-
-                        if (bitmap != null)
-                        {
-                            var encoded = bitmap.Encode(ETextureFormat.Png, false, out _);
-                            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-                            File.WriteAllBytes(outputPath + ".png", encoded);
-                            Interlocked.Increment(ref totalExportedFiles);
-                            break;
-                        }
-                        else
-                        {
-                            Console.WriteLine($"ERROR: Failed to export {file.Path} (not a valid image bitmap).");
-                        }
-                    }
-                    else
-                    {
-                        // Not necessarily an error
-                        // Console.WriteLine($"ERROR: Failed to export {file.Path} (object is not of type UTexture2D).");
-                    }
+                    if (outputType == "json" && provider.TryCreateReader(file.Path, out var archive))
+                        SerializeAndExportJson(new FTextLocalizationResource(archive), file);
+                    break;
                 }
-                break;
 
+            case "locmeta":
+                {
+                    if (outputType == "json" && provider.TryCreateReader(file.Path, out var archive))
+                        SerializeAndExportJson(new FTextLocalizationMetaDataResource(archive), file);
+                    break;
+                }
+
+            case "upluginmanifest":
+            case "uproject":
+            case "manifest":
+            case "uplugin":
+            case "archive":
+            case "vmodule":
+            case "verse":
+            case "html":
             case "json":
-                var json = JsonConvert.SerializeObject(allObjects, Formatting.Indented);
-                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-                File.WriteAllText(outputPath + ".json", json);
-                Interlocked.Increment(ref totalExportedFiles);
-                break;
-
-            case "uasset":
-                // Referenced from FModel's ExportData(). uexp is tied to the uasset file.
-                // https://github.com/4sval/FModel/blob/master/FModel/ViewModels/CUE4ParseViewModel.cs#L928
-                // Possible refactor to include TryGetValue
-                // https://github.com/FabianFG/CUE4Parse/blob/b3550db731303a6f383ca2b4f61737ca870deef2/CUE4Parse/FileProvider/AbstractFileProvider.cs#L562
-                if (provider.TrySavePackage(file, out var assets))
+            case "ini":
+            case "txt":
+            case "log":
+            case "bat":
+            case "dat":
+            case "cfg":
+            case "ide":
+            case "ipl":
+            case "zon":
+            case "xml":
+            case "css":
+            case "csv":
+            case "pem":
+            case "tps":
+            case "lua":
+            case "js":
+            case "po":
+            case "h":
                 {
-                    Parallel.ForEach(assets, kvp =>
-                    {
-                        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-                        File.WriteAllBytes(outputPath + "." + kvp.Key.SubstringAfterLast('.'), kvp.Value);
-                        Interlocked.Increment(ref totalExportedFiles);
-                    });
+                    if (provider.TrySaveAsset(file.Path, out var data))
+                        ExportRaw(data, file);
+                    break;
                 }
-                break;
-
-                // case "uexp":
-                //     if (provider.TrySavePackage(file, out var assets))
-                //     {
-                //         Parallel.ForEach(assets, kvp =>
-                //         {
-                //             lock (new object())
-                //             {
-                //                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-                //                 File.WriteAllBytes(outputPath + ".uexp", kvp.Value);
-                //             }
-                //         });
-                //     }
-                //     Interlocked.Increment(ref totalExportedFiles);
-                //     break;
         }
     }
 
-    static void ExportLocres(AbstractFileProvider provider, GameFile file, string outputPath, string outputType)
+    static void ExportPng(IEnumerable<UObject> allObjects, GameFile file)
     {
-        if (outputType == "json" && provider.TryCreateReader(file.Path, out var archive))
+
+        foreach (var obj in allObjects)
         {
-            var locres = new FTextLocalizationResource(archive);
-            var json = JsonConvert.SerializeObject(locres, Formatting.Indented);
-            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            File.WriteAllText(outputPath + ".json", json);
-            Interlocked.Increment(ref totalExportedFiles);
+            if (obj is UTexture2D texture)
+            {
+                var bitmap = texture.Decode(ETexturePlatform.DesktopMobile);
+                if (bitmap == null) continue;
+
+                string outputFilePath = Path.Combine(outputBaseDir, Path.ChangeExtension(file.Path, ".png"));
+                var encoded = bitmap.Encode(ETextureFormat.Png, false, out _);
+
+                Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
+                File.WriteAllBytes(outputFilePath, encoded);
+                Interlocked.Increment(ref totalExportedFiles);
+                return;
+            }
         }
     }
 
-    static void ExportJs(AbstractFileProvider provider, GameFile file, string outputPath, string outputType)
+    static void SerializeAndExportJson(object data, GameFile file)
     {
-        if (outputType == "js" && provider.TrySaveAsset(file.Path, out var data))
-        {
-            using var stream = new MemoryStream(data) { Position = 0 };
-            using var reader = new StreamReader(stream);
-            JSBeautifyOptions options = new() { };
-            JSBeautify beautifier = new(reader.ReadToEnd(), options);
-            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            File.WriteAllText(outputPath + ".js", beautifier.GetResult());
-            Interlocked.Increment(ref totalExportedFiles);
-        }
+        string outputFilePath = Path.Combine(outputBaseDir, Path.ChangeExtension(file.Path, ".json"));
+        Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
+        File.WriteAllText(outputFilePath, JsonConvert.SerializeObject(data, Formatting.Indented));
+        Interlocked.Increment(ref totalExportedFiles);
     }
 
-    static void ExportDb(AbstractFileProvider provider, GameFile file, string outputPath, string outputType)
+    static void ExportRaw(byte[] data, GameFile file)
     {
-        if (outputType == "db" && provider.TrySaveAsset(file.Path, out var data))
+        string ext = Path.GetExtension(file.Path);
+        string outputFilePath = Path.Combine(outputBaseDir, file.Path);
+
+        if (ext == ".js")
         {
-            using var stream = new MemoryStream(data) { Position = 0 };
-            using var reader = new StreamReader(stream);
-            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            File.WriteAllBytes(outputPath + ".db", data);
-            Interlocked.Increment(ref totalExportedFiles);
+            using var reader = new StreamReader(new MemoryStream(data));
+            JSBeautify beautifier = new(reader.ReadToEnd(), new());
+            Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
+            File.WriteAllText(outputFilePath, beautifier.GetResult());
         }
+        else
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
+            File.WriteAllBytes(outputFilePath, data);
+        }
+
+        Interlocked.Increment(ref totalExportedFiles);
     }
 }

@@ -2,9 +2,9 @@ using System.Reflection;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
-public class ExporterCli : Command<CliSettings>
+public class ExporterCli : AsyncCommand<CliSettings>
 {
-    public override int Execute(CommandContext context, CliSettings settings, CancellationToken cancellation)
+    public override async Task<int> ExecuteAsync(CommandContext context, CliSettings settings, CancellationToken cancellationToken)
     {
         AnsiConsole.Clear();
         ConfigObj config = new();
@@ -52,7 +52,7 @@ public class ExporterCli : Command<CliSettings>
 
         AnsiConsole.Write(table);
 
-        ExportService.InitExporter(config);
+        await ExportService.InitExporter(config);
 
         return 0;
     }

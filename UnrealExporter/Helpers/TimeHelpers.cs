@@ -5,8 +5,14 @@ public class TimeHelpers
         return DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds;
     }
 
-    public static string Elapsed(double start, double end, int factor = 1)
+    public static string TimeSince(double start)
     {
-        return ((end - start) / factor).ToString("0.00");
+        return FormatMs(Now() - start);
+    }
+
+    public static string FormatMs(double ms)
+    {
+        var ts = TimeSpan.FromMilliseconds(ms);
+        return $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
     }
 }
