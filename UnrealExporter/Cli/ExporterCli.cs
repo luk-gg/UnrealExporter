@@ -32,7 +32,7 @@ public class ExporterCli : Command<CliSettings>
         // TODO: check if valid config/sufficient args
         
 #if DEBUG
-        AnsiConsole.MarkupLine($"[dim]unrealexporter {ConfigService.StringifyConfig(config)}[/]");
+        AnsiConsole.MarkupLine($"[dim]unrealexporter {ConfigService.StringifyConfig(config)}[/]\n");
 #endif
 
         var table = new Table()

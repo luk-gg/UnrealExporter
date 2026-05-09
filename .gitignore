@@ -11,4 +11,5 @@ desktop.ini
 /UnrealExporter/configs/*.json
 !/UnrealExporter/configs/_*.json
 /UnrealExporter/mappings/*.usmap
-**.ckpt
+/UnrealExporter/checkpoints/*.ckpt
+!/UnrealExporter/checkpoints/_*.ckpt
