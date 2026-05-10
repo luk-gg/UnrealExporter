@@ -196,6 +196,7 @@ public class ExportService
                         case "jpeg":
                         case "tga":
                         case "webp":
+                        case "hdr":
                             ExportImage(packageObjects, file, outputType);
                             break;
                     }
@@ -261,16 +262,27 @@ public class ExportService
                 var bitmap = texture.Decode(ETexturePlatform.DesktopMobile);
                 if (bitmap == null) continue;
 
-                var encoded = outputType switch
-                {
-                    "png" => bitmap.Encode(ETextureFormat.Png, false, out _),
-                    "jpg" or "jpeg" => bitmap.Encode(ETextureFormat.Jpeg, false, out _),
-                    "tga" => bitmap.Encode(ETextureFormat.Tga, false, out _),
-                    "webp" => EncodeWebp(bitmap),
-                    _ => bitmap.Encode(ETextureFormat.Png, false, out _)
-                };
+                string ext = outputType;
+                byte[] encoded;
 
-                string outputFilePath = Path.Combine(outputBaseDir, Path.ChangeExtension(file.Path, $".{outputType}"));
+                if (outputType == "hdr")
+                {
+                    encoded = bitmap.Encode(ETextureFormat.Png, true, out var hdrExt);
+                    ext = hdrExt; // will be "hdr" for HDR textures, "png" for non-HDR
+                }
+                else
+                {
+                    encoded = outputType switch
+                    {
+                        "png" => bitmap.Encode(ETextureFormat.Png, false, out _),
+                        "jpg" or "jpeg" => bitmap.Encode(ETextureFormat.Jpeg, false, out _),
+                        "tga" => bitmap.Encode(ETextureFormat.Tga, false, out _),
+                        "webp" => EncodeWebp(bitmap),
+                        _ => bitmap.Encode(ETextureFormat.Png, false, out _)
+                    };
+                }
+
+                string outputFilePath = Path.Combine(outputBaseDir, Path.ChangeExtension(file.Path, $".{ext}"));
                 Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
                 File.WriteAllBytes(outputFilePath, encoded);
                 Interlocked.Increment(ref totalExportedFiles);
