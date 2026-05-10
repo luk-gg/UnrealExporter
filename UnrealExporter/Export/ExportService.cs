@@ -13,6 +13,7 @@ using CUE4Parse_Conversion.Textures;
 using CUE4Parse_Conversion.Textures.BC;
 using JSBeautifyLib;
 using Newtonsoft.Json;
+using SkiaSharp;
 using Spectre.Console;
 using System.Text.RegularExpressions;
 using System.Collections.Concurrent;
@@ -22,8 +23,6 @@ record ExportMatch(string OutputType);
 public class ExportService
 {
     private static string outputBaseDir = "";
-
-    private static int totalRegexMatches = 0;
 
     private static int totalExportedFiles = 0;
 
@@ -42,13 +41,13 @@ public class ExportService
             AbstractFileProvider provider = CreateProvider(config);
 
             double start = TimeHelpers.Now();
-            totalRegexMatches = 0;
+            int matchedFiles = 0;
             totalExportedFiles = 0;
             errors = [];
             outputBaseDir = config.OutputPath;
 
             var totalFiles = provider.Files.Count;
-            int processed = 0;
+            int processedFiles = 0;
             string currentFile = "";
 
             AnsiConsole.MarkupLine($"\nFound {totalFiles:N0} files.\n");
@@ -68,13 +67,13 @@ public class ExportService
                         lock (_refreshLock)
                         {
                             // Refresh every 1%
-                            if (processed % (totalFiles / 100) == 0 || processed >= totalFiles - (totalFiles / 100))
+                            if (processedFiles > 0 && (processedFiles % (totalFiles / 100) == 0 || processedFiles >= totalFiles - (totalFiles / 100)))
                             {
-                                var pct = (double)processed / totalFiles;
+                                var pct = (double)processedFiles / totalFiles;
                                 var filled = (int)(pct * 40);
                                 var bar = $"[green]{new string('━', filled)}[/][grey]{new string('━', 40 - filled)}[/]";
-                                var stats = $"Matched [blue]{totalRegexMatches}[/]  Exported [blue]{totalExportedFiles}[/]  Elapsed [blue]{TimeHelpers.TimeSince(start)}[/]";
-                                if (processed == totalFiles) stats = "[dim]" + stats + "[/]";
+                                var stats = $"Matched [blue]{matchedFiles}[/]  Exported [blue]{totalExportedFiles}[/]  Elapsed [blue]{TimeHelpers.TimeSince(start)}[/]";
+                                if (processedFiles == totalFiles) stats = "[dim]" + stats + "[/]";
 
                                 table.Rows.Clear();
                                 table.AddRow(new Markup($"[dim]{Markup.Escape(currentFile)}[/]"));
@@ -90,22 +89,27 @@ public class ExportService
                     {
                         try
                         {
-                            var match = GetRegexMatch(file.Value.Path, config);
-                            if (match != null && !IsExcluded(file.Value.Path, config))
-                            {
-                                currentFile = file.Value.Path;
-                                Interlocked.Increment(ref totalRegexMatches);
+                            var matches = GetRegexMatches(file.Value.Path, config).ToList();
 
-                                try { ExportFile(provider, file.Value, match.OutputType); }
-                                catch (AggregateException ae) { Console.WriteLine(ae.Message); }
+                            if (matches.Count > 0 && !IsExcluded(file.Value.Path, config))
+                            {
+                                Interlocked.Increment(ref matchedFiles);
+
+                                var ext = Path.GetExtension(file.Value.Path).TrimStart('.').ToLower();
+
+                                // Only load package objects once even if the file is exported in multiple formats (i.e. jpg + png)
+                                IEnumerable<UObject>? packageObjects = (ext is "uasset" or "umap") && matches.Count > 1
+                                    ? provider.LoadPackage(file.Value.Path).GetExports()
+                                    : null;
+
+                                foreach (var match in matches)
+                                    ExportFile(provider, file.Value, ext, match.OutputType, packageObjects);
                             }
 
-                            Interlocked.Increment(ref processed);
+                            Interlocked.Increment(ref processedFiles);
                             Refresh();
                         }
-                        catch (AggregateException ae) { errors.Add($"{file.Value.Path} — {ae.Message}"); }
                         catch (Exception e) { errors.Add($"{file.Value.Path} — {e.Message}"); }
-
                     });
                 });
 
@@ -164,31 +168,37 @@ public class ExportService
         return provider;
     }
 
-    static ExportMatch? GetRegexMatch(string filePath, ConfigObj config) =>
+    static IEnumerable<ExportMatch> GetRegexMatches(string filePath, ConfigObj config) =>
         config.ExportPaths
             .Where(p => p.Contains(':'))
             .Select(p => new { Pattern = p[..p.LastIndexOf(':')], OutputType = p.SubstringAfterLast(':') })
-            .FirstOrDefault(p => Regex.IsMatch(filePath, "^" + p.Pattern + "$", RegexOptions.IgnoreCase))
-            is { } match ? new ExportMatch(match.OutputType.ToLower()) : null;
+            .Where(p => Regex.IsMatch(filePath, "^" + p.Pattern + "$", RegexOptions.IgnoreCase))
+            .Select(p => new ExportMatch(p.OutputType.ToLower()));
 
     static bool IsExcluded(string filePath, ConfigObj config) =>
         config.ExcludePaths.Any(p => Regex.IsMatch(filePath, "^" + p + "$", RegexOptions.IgnoreCase));
 
-    static void ExportFile(AbstractFileProvider provider, GameFile file, string outputType)
+    static void ExportFile(AbstractFileProvider provider, GameFile file, string ext, string outputType, IEnumerable<UObject>? packageObjects = null)
     {
-        var originalType = file.Path.SubstringAfterLast('.').ToLower();
-
-        switch (originalType)
+        switch (ext)
         {
             case "uasset":
             case "umap":
                 {
-                    var allObjects = provider.LoadPackageObjects(file.Path);
-
-                    if (outputType == "json")
-                        SerializeAndExportJson(allObjects, file);
-                    else if (outputType == "png")
-                        ExportPng(allObjects, file);
+                    packageObjects ??= provider.LoadPackage(file.Path).GetExports();
+                    switch (outputType)
+                    {
+                        case "json":
+                            SerializeAndExportJson(packageObjects, file);
+                            break;
+                        case "png":
+                        case "jpg":
+                        case "jpeg":
+                        case "tga":
+                        case "webp":
+                            ExportImage(packageObjects, file, outputType);
+                            break;
+                    }
 
                     break;
                 }
@@ -242,25 +252,38 @@ public class ExportService
         }
     }
 
-    static void ExportPng(IEnumerable<UObject> allObjects, GameFile file)
+    static void ExportImage(IEnumerable<UObject> packageObjects, GameFile file, string outputType)
     {
-
-        foreach (var obj in allObjects)
+        foreach (var obj in packageObjects)
         {
             if (obj is UTexture2D texture)
             {
                 var bitmap = texture.Decode(ETexturePlatform.DesktopMobile);
                 if (bitmap == null) continue;
 
-                string outputFilePath = Path.Combine(outputBaseDir, Path.ChangeExtension(file.Path, ".png"));
-                var encoded = bitmap.Encode(ETextureFormat.Png, false, out _);
+                var encoded = outputType switch
+                {
+                    "png" => bitmap.Encode(ETextureFormat.Png, false, out _),
+                    "jpg" or "jpeg" => bitmap.Encode(ETextureFormat.Jpeg, false, out _),
+                    "tga" => bitmap.Encode(ETextureFormat.Tga, false, out _),
+                    "webp" => EncodeWebp(bitmap),
+                    _ => bitmap.Encode(ETextureFormat.Png, false, out _)
+                };
 
+                string outputFilePath = Path.Combine(outputBaseDir, Path.ChangeExtension(file.Path, $".{outputType}"));
                 Directory.CreateDirectory(Path.GetDirectoryName(outputFilePath)!);
                 File.WriteAllBytes(outputFilePath, encoded);
                 Interlocked.Increment(ref totalExportedFiles);
                 return;
             }
         }
+    }
+
+    static byte[] EncodeWebp(CTexture bitmap)
+    {
+        using var skBitmap = bitmap.ToSkBitmap();
+        using var data = skBitmap.Encode(SKEncodedImageFormat.Webp, 100);
+        return data.ToArray();
     }
 
     static void SerializeAndExportJson(object data, GameFile file)

@@ -73,3 +73,4 @@ The exporter should now be able to detect the game files.
 
 <!-- TODO: reimplement checkpoints -->
 <!-- TODO: reimplement locale -->
+<!-- TODO: test extracting audio -->

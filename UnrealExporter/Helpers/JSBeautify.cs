@@ -1,3 +1,4 @@
+#pragma warning disable CS8618
 // Source: https://github.com/kriskowal/montage-simple-flow/blob/master/node_modules/montage-testing/support/js-beautify/attic/unmaintained/c-sharp/JSBeautify.cs
 // converted from javascript by rekna anker <rekna1@gmail.com>
 

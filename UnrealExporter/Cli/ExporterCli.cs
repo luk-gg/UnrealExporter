@@ -45,10 +45,10 @@ public class ExporterCli : Command<CliSettings>
         table.AddRow("Game path", Markup.Escape(config.GamePath));
         table.AddRow("Output path", Markup.Escape(config.OutputPath));
         table.AddRow("Engine version", Markup.Escape(config.EngineVersion));
-        table.AddRow("AES keys", config.AesKeys.Length > 0 ? string.Join("\n", config.AesKeys.Select(k => Markup.Escape(k))) : "[dim]none[/]");
+        table.AddRow($"AES keys ({config.AesKeys.Length})", config.AesKeys.Length > 0 ? string.Join("\n", config.AesKeys.Select(k => Markup.Escape(k))) : "[dim]none[/]");
         table.AddRow("Mapping file", string.IsNullOrEmpty(config.MappingFile) ? "[dim]none[/]" : Markup.Escape(config.MappingFile));
-        table.AddRow("Export paths", config.ExportPaths.Length > 0 ? string.Join("\n", config.ExportPaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
-        table.AddRow("Exclude paths", config.ExcludePaths.Length > 0 ? string.Join("\n", config.ExcludePaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
+        table.AddRow($"Export paths ({config.ExportPaths.Length})", config.ExportPaths.Length > 0 ? string.Join("\n", config.ExportPaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
+        table.AddRow($"Exclude paths ({config.ExcludePaths.Length})", config.ExcludePaths.Length > 0 ? string.Join("\n", config.ExcludePaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
 
         AnsiConsole.Write(table);
 
