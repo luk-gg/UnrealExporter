@@ -178,6 +178,7 @@ public class ExportService
     static bool IsExcluded(string filePath, ConfigObj config) =>
         config.ExcludePaths.Any(p => Regex.IsMatch(filePath, "^" + p + "$", RegexOptions.IgnoreCase));
 
+    // https://github.com/4sval/FModel/blob/dev/FModel/ViewModels/CUE4ParseViewModel.cs#L635
     static void ExportFile(AbstractFileProvider provider, GameFile file, string ext, string outputType, IEnumerable<UObject>? packageObjects = null)
     {
         switch (ext)
@@ -196,7 +197,7 @@ public class ExportService
                         case "jpeg":
                         case "tga":
                         case "webp":
-                        case "hdr":
+                        case "hdr": // untested but fallback to png works
                             ExportImage(packageObjects, file, outputType);
                             break;
                     }
@@ -211,40 +212,44 @@ public class ExportService
                     break;
                 }
 
-            case "locmeta":
+            case "locmeta": // untested
                 {
                     if (outputType == "json" && provider.TryCreateReader(file.Path, out var archive))
                         SerializeAndExportJson(new FTextLocalizationMetaDataResource(archive), file);
                     break;
                 }
 
-            case "upluginmanifest":
-            case "uproject":
-            case "manifest":
-            case "uplugin":
-            case "archive":
-            case "vmodule":
-            case "verse":
-            case "html":
-            case "json":
-            case "ini":
-            case "txt":
-            case "log":
-            case "bat":
-            case "dat":
-            case "cfg":
-            case "ide":
-            case "ipl":
-            case "zon":
-            case "xml":
-            case "css":
-            case "csv":
-            case "pem":
-            case "tps":
-            case "lua":
+            case "upluginmanifest": // untested
+            case "uproject": // untested
+            case "manifest": // untested
+            case "uplugin": // untested
+            case "archive": // untested
+            case "vmodule": // untested
+            case "verse": // untested
+            case "html": // untested
+            case "json": // untested
+            case "ini": // untested
+            case "txt": // untested
+            case "log": // untested
+            case "bat": // untested
+            case "dat": // untested
+            case "cfg": // untested
+            case "ide": // untested
+            case "ipl": // untested
+            case "zon": // untested
+            case "xml": // untested
+            case "css": // untested
+            case "csv": // untested
+            case "pem": // untested
+            case "tps": // untested
+            case "lua": // untested
             case "js":
-            case "po":
-            case "h":
+            case "po": // untested
+            case "h": // untested
+            // Fonts may need to be renamed to change file extension
+            case "ufont": // untested
+            case "otf": // untested
+            case "ttf": // untested
                 {
                     if (provider.TrySaveAsset(file.Path, out var data))
                         ExportRaw(data, file);

@@ -7,7 +7,7 @@ A CLI for extracting and datamining Unreal Engine game assets, powered by [CUE4P
 - [x] [Checkpoint system](#checkpoints) (only export new/changed files)
 - [x] Parallel-processing files
 - [x] Apply mapping files
-- [x] Supports [30+ file types](/UnrealExporter/Export/ExportService.cs#L177) seen in UE games
+- [x] Supports [30+ file types](/UnrealExporter/Export/ExportService.cs#L186) seen in UE games
 
 All games supported by FModel are supported, as both use CUE4Parse.
 
@@ -73,4 +73,4 @@ The exporter should now be able to detect the game files.
 
 <!-- TODO: reimplement checkpoints -->
 <!-- TODO: reimplement locale -->
-<!-- TODO: test extracting audio -->
+<!-- TODO: implement extracting audio (.hca → .wav in SAOFD; .wem, .bnk, .pck in Fmodel Extract(); .ogg, .wav, .opus, .mp3 outputs) -->
