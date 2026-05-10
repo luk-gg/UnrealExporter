@@ -122,7 +122,7 @@ public class UnrealExporter
             int index = 0;
             foreach (ConfigObj obj in configObjs)
             {
-                obj.ConfigFileName = path.Split(Path.DirectorySeparatorChar).Last();
+                obj.ConfigFileName = Path.GetFileName(path);
                 obj.ConfigObjectIndex = index;
                 index++;
             }
@@ -154,7 +154,7 @@ public class UnrealExporter
         // Also check items that were passed in args
         for (int i = 0; i < allConfigFilePaths.Length; i++)
         {
-            string fileName = allConfigFilePaths[i].Split(Path.DirectorySeparatorChar).Last();
+            string fileName = Path.GetFileName(allConfigFilePaths[i]);
             if (fileName.Length > longestFileName)
             {
                 longestFileName = fileName.Length;
@@ -170,7 +170,7 @@ public class UnrealExporter
         List<string> paddedFileNames = [];
         foreach (string filePath in allConfigFilePaths)
         {
-            string fileName = filePath.Split(Path.DirectorySeparatorChar).Last();
+            string fileName = Path.GetFileName(filePath);
             paddedFileNames.Add(fileName.PadRight(longestFileName + 1, ' '));
         }
 
@@ -246,7 +246,7 @@ public class UnrealExporter
                     {
                         if (selectedOptions[i])
                         {
-                            result.Add(allConfigFilePaths[i - 1].Split(Path.DirectorySeparatorChar).Last().Split(".")[0]);
+                            result.Add(Path.GetFileNameWithoutExtension(allConfigFilePaths[i - 1]));
                         }
                     }
                     Console.WriteLine();
@@ -292,7 +292,7 @@ public class UnrealExporter
                             allConfigObjs.Add(configObj);
                         }
                         totalConfigFiles++;
-                        Console.WriteLine($"{filePath.Split(Path.DirectorySeparatorChar).Last()} ({configObjsInFile.Count} object{(configObjsInFile.Count > 1 ? "s" : "")})");
+                        Console.WriteLine($"{Path.GetFileName(filePath)} ({configObjsInFile.Count} object{(configObjsInFile.Count > 1 ? "s" : "")})");
                     }
                 }
             }
@@ -430,15 +430,15 @@ public class UnrealExporter
             var fileName = Path.GetFileNameWithoutExtension(file.Value.Path);
 
             // "Hotta\Content\Resources\UI\Activity\Activity\DT_Activityquest_Balance"
-            var filePath = fileDir + Path.DirectorySeparatorChar + fileName;
+            var filePath = Path.Combine(fileDir, fileName);
 
             // "D:\UnrealExporter\output\Hotta\Content\Resources\UI\Activity\Activity"
             var outputDir = config.KeepDirectoryStructure ?
-                Path.GetFullPath(config.OutputDir) + Path.DirectorySeparatorChar + fileDir
+                Path.Combine(Path.GetFullPath(config.OutputDir), fileDir)
                 : Path.GetFullPath(config.OutputDir);
 
             // "D:\UnrealExporter\output\Hotta\Content\Resources\UI\Activity\Activity\DT_Activityquest_Balance"
-            var outputPath = outputDir + Path.DirectorySeparatorChar + fileName;
+            var outputPath = Path.Combine(outputDir, fileName);
 
             List<string> regexMatches =
                 config.Export
@@ -692,21 +692,41 @@ public class UnrealExporter
                     return [];
                 }
 
-                var sortedPaths = pathsForGameTitle.OrderBy(path =>
+                var validCheckpoints = new List<(string Path, double UnixTime)>();
+                foreach (var path in pathsForGameTitle)
                 {
-                    string dateTimeFromFileName = path.Split(Path.DirectorySeparatorChar).Last().Split(".").First().SubstringAfter(config.GameTitle)[1..];
-                    string date = dateTimeFromFileName.Split(" ")[0];
-                    string time = dateTimeFromFileName.Split(" ")[1].Replace("-", ":");
-                    double unixTime = DateTime.Parse($"{date} {time}").Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
-                    return unixTime;
-                });
+                    string fileName = Path.GetFileNameWithoutExtension(path);
+                    string pattern = @"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})";
+                    Match match = Regex.Match(fileName, pattern);
 
-                var latestCheckpointPath = sortedPaths.Last();
+                    if (match.Success)
+                    {
+                        string dateTimeString = match.Groups[1].Value;
+                        string format = "yyyy-MM-dd_HH-mm-ss";
+
+                        if (DateTime.TryParseExact(dateTimeString, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+                        {
+                            validCheckpoints.Add((path, ((DateTimeOffset)parsedDate).ToUnixTimeSeconds()));
+                        }
+                    }
+                }
+
+                var latestCheckpoint = validCheckpoints
+                    .OrderBy(c => c.UnixTime)
+                    .LastOrDefault();
+
+                if (latestCheckpoint.Path == null)
+                {
+                    Console.WriteLine($"ERROR: Found checkpoints for \"{config.GameTitle}\", but none have a valid timestamp. Ignoring...");
+                    return [];
+                }
+                var latestCheckpointPath = latestCheckpoint.Path;
+
 
                 if (File.Exists(latestCheckpointPath))
                 {
                     useCheckpoint = true;
-                    Console.WriteLine($"Using checkpoint: latest ({latestCheckpointPath.Split(Path.DirectorySeparatorChar).Last()})");
+                    Console.WriteLine($"Using checkpoint: latest ({Path.GetFileName(latestCheckpointPath)})");
                     var fromFile = File.ReadAllText(latestCheckpointPath);
                     var loadedCheckpoint = JsonConvert.DeserializeObject<Dictionary<string, long>>(fromFile);
                     return loadedCheckpoint ?? [];
@@ -745,8 +765,11 @@ public class UnrealExporter
         {
             Directory.CreateDirectory(checkpointsDirPath);
         }
-        File.WriteAllText($"./checkpoints/{config.GameTitle} {dateStamp}.ckpt", newCheckpointJson);
-        Console.WriteLine($"Created checkpoint file: ./checkpoints/{config.GameTitle} {dateStamp}.ckpt");
+
+        var checkpointFileName = $"{config.GameTitle}_{dateStamp}.ckpt";
+
+        File.WriteAllText(Path.Combine(checkpointsDirPath, checkpointFileName), newCheckpointJson);
+        Console.WriteLine($"Created checkpoint file: {checkpointFileName}");
     }
 
     public static double Now()
