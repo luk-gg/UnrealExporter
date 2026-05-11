@@ -89,7 +89,7 @@ public class ConfigService
         config.AesKeys = aesKeys.Distinct().ToArray();
         AnsiConsole.WriteLine("");
 
-        // TODO: Check if mapping file exists at start of extraction
+
         AnsiConsole.MarkupLine($"If your game needs a mapping file, enter the name of the file, which should be placed in UnrealExporter/mappings [dim](MyGame.usmap)[/]:");
         AnsiConsole.MarkupLine("[dim italic]Leave blank to skip[/]");
         config.MappingFileName = Ask();
@@ -295,14 +295,17 @@ public class ConfigService
                 Add(flag, value);
         }
 
-        Add("-t", config.ConfigTitle);
-        Add("-p", config.GamePath);
-        Add("-o", config.OutputPath);
-        AddMany("--aes", config.AesKeys ?? []);
+        Add("--title", config.ConfigTitle);
+        Add("--path", config.GamePath);
+        Add("--out", config.OutputPath);
+        Add("--version", config.EngineVersion);
+        AddMany("--aes", config.AesKeys);
         Add("--map", config.MappingFileName);
-        AddMany("--export", config.ExportPaths ?? []);
-        AddMany("--exclude", config.ExcludePaths ?? []);
-
+        if (config.CreateNewCheckpoint) result += "--create-checkpoint ";
+        Add("--checkpoint", config.CheckpointFileName);
+        AddMany("--export", config.ExportPaths);
+        AddMany("--exclude", config.ExcludePaths);
+        
         return Markup.Escape(result.Trim());
     }
 
@@ -323,6 +326,7 @@ public class ConfigService
         return AnsiConsole.Prompt(prompt);
     }
 
+    // TODO: reimplement custom version detection (i.e. GAME_TowerOfFantasy, GAME_NevernessToEverness)
     static string? DetectEngineVersion(string GamePath)
     {
         static string? FindGameExe(string gameDir)

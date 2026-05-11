@@ -17,7 +17,7 @@ public class ExporterCli : Command<CliSettings>
                 var configPath = Path.Combine(ConfigService.ConfigsDirectory, PathHelpers.ForceExtension(settings.ConfigFile, ".json"));
                 config = ConfigService.LoadConfig(configPath);
             }
-
+            Console.WriteLine(config.CreateNewCheckpoint);
             // Append CLI arguments (overwrite config keys if collision)
             AppendSettingsToConfig(settings, config);
         }
@@ -28,13 +28,12 @@ public class ExporterCli : Command<CliSettings>
             config = ConfigService.PromptConfigSelection();
         }
 
-        // TODO: check if valid config/sufficient args
+        // TODO: check if valid config/sufficient args, files exist, etc.
 
 #if DEBUG
         AnsiConsole.MarkupLine($"[dim]unrealexporter {ConfigService.StringifyConfig(config)}[/]\n");
 #endif
-        Console.WriteLine(config.MappingFileName);
-        Console.WriteLine(settings.MappingFileName);
+
         var table = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Grey)
@@ -80,7 +79,7 @@ public class ExporterCli : Command<CliSettings>
                 continue; // property doesn't exist in config
 
             var value = sProp.GetValue(settings);
-            if (value is null)
+            if (value is null || value is false)
                 continue;
 
             if (value is string str && string.IsNullOrWhiteSpace(str))

@@ -4,65 +4,66 @@ public sealed class SelectionOption
     public ConfigObj? Config { get; set; }
     public string ConfigPath { get; set; } = "";
 }
-// TODO: proofread these
+// Keep these descriptions identical to UnrealExporter/Cli/CliSettings.cs
 public sealed class ConfigObj
 {
     /// <summary>
-    /// A name of the config file. Used when listing configs or in error messages.
+    /// Display name for this config. Used in the selection menu and log output.
     /// </summary>
     /// <remarks>
-    /// If this title matches the game title, a <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">custom UE version</a> may be automatically detected.
+    /// When building a new config, this title will be used to look for AES keys and to detect a <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">custom UE version</a>.
     /// </remarks>
     public string? ConfigTitle { get; set; }
 
     /// <summary>
-    /// A path to the directory containing the game's files.
+    /// Absolute path to the game's root directory or paks folder.
     /// </summary>
     public string GamePath { get; set; } = "";
 
     /// <summary>
-    /// A path to a directory that will contain extracted assets.
+    /// Absolute path to the directory where extracted assets will be saved.
     /// </summary>
     public string OutputPath { get; set; } = "";
 
     /// <summary>
-    /// The Unreal Engine version used to compile the game.
+    /// Unreal Engine version string, e.g. <c>5.1</c>. Some games require a custom value from
+    /// <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">EGame.cs</a>,
+    /// e.g. <c>TowerOfFantasy</c>.
     /// </summary>
-    /// <remarks>
-    /// Often found in the game's Win64-Shipping.exe file details. Some games use a <a href="https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Versions/EGame.cs">custom offset</a>.
-    /// </remarks>
     public string EngineVersion { get; set; } = "";
 
     /// <summary>
-    /// A list of AES-256 encryption keys to load.
+    /// One or more AES-256 decryption keys for encrypted pak files, in <c>0x</c> hex format.
     /// </summary>
     public string[] AesKeys { get; set; } = [];
 
     /// <summary>
-    /// Name of <c>.usmap</c> file in /mappings.
+    /// Filename of a <c>.usmap</c> mappings file placed in the <c>/mappings</c> folder, e.g. <c>Palworld.usmap</c>.
+    /// Required for games that use unversioned properties.
     /// </summary>
     public string MappingFileName { get; set; } = "";
 
     /// <summary>
-    /// A list of virtual file paths to assets to be extracted.
+    /// Virtual paths of assets to extract, as regex patterns with a colon-separated output format.
+    /// Example: <c>Pal/Content/Textures/.*.uasset:png</c>
     /// </summary>
-    /// <remarks>
-    /// Specify the desired file extension with a colon, such as <c>MyGame\DataTables\.*.uasset:json</c>, <c>MyGame\UI\.*.uasset:png</c>.
-    /// </remarks>
     public string[] ExportPaths { get; set; } = [];
 
     /// <summary>
-    /// A list of virtual file paths to assets to be <b>excluded</b> from extraction, useful for avoiding files that crash CUE4Parse.
+    /// Virtual paths to exclude from extraction, as regex patterns.
+    /// Useful for skipping files known to cause errors.
     /// </summary>
     public string[] ExcludePaths { get; set; } = [];
 
     /// <summary>
-    /// Whether or not to create a new checkpoint file.
+    /// If true, saves a checkpoint file after extraction, tracking each asset's file size.
+    /// Checkpoints can be used to save time by skipping the extraction of unchanged files.
     /// </summary>
     public bool CreateNewCheckpoint { get; set; } = false;
 
     /// <summary>
-    /// 
+    /// Name of a checkpoint file in <c>/checkpoints</c> to load before extraction, e.g. <c>palworld_2026-01-15_13-45.json</c>.
+    /// Use <c>latest</c> to automatically load the most recent checkpoint for this config.
     /// </summary>
     public string? CheckpointFileName { get; set; } = null;
 }

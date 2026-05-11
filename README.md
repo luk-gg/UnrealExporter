@@ -1,7 +1,8 @@
+<!-- Available under the Apache License 2.0 at https://github.com/luk-gg/UnrealExporter -->
 # UnrealExporter
 A CLI for extracting and datamining Unreal Engine game assets, powered by [CUE4Parse](https://github.com/FabianFG/CUE4Parse).
 
-## [Features](#features)
+## Features
 - [x] Regex paths for bulk extracting
 - [x] Path exclusions to avoid crashing
 - [x] [Checkpoint system](#checkpoints) (only extract new/changed files)
@@ -11,7 +12,7 @@ A CLI for extracting and datamining Unreal Engine game assets, powered by [CUE4P
 
 All games supported by FModel are supported, as both use CUE4Parse.
 
-## [Usage](#usage)
+## Usage
 UnrealExporter can be used entirely with flags (run with `--help` or see [here](/UnrealExporter/Cli/CliSettings.cs)), or you can create reusable config files. If both are provided, flags will override config values. An interactive config builder is available when running the exe without any arguments (or see [example config](/UnrealExporter/examples/palworld-config.json)).
 
 ### Download and run
@@ -30,14 +31,17 @@ dotnet run --project UnrealExporter -- pal.json -m MappingOverride.usmap --creat
 If you wish to build the project as a executable binary, use the following command:
 
 ```sh
-dotnet publish -c Release --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false
+dotnet publish UnrealExporter -c Release --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false
 ```
 
-## [Checkpoints](#checkpoints)
+## Checkpoints
 Checkpoints allow you to extract only new/modified files and skip unchanged files by keeping track of file sizes (see [example checkpoint](/UnrealExporter/examples/palworld-checkpoint.json)), greatly increasing extraction speed. **Checkpoints will always track all game files, regardless of what you extract/exclude.** Thus it is safe to use an existing checkpoint *and* create a new checkpoint at the same time to repeatedly only extract changed files every time a game updates.
 
 > [!TIP]
 > You can quickly create a checkpoint without extracting anything by using the flags `--create-checkpoint --exclude "*"`
+
+> [!TIP]
+> `CreateNewCheckpoint` (bool) and `CheckpointFileName` (filename.json) can optionally be added to your config files (see the [example config](/UnrealExporter/examples/palworld-config.json)).
 
 ## Helpful resources
 AES Keys:
