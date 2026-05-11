@@ -93,6 +93,9 @@ public class ExportService
                     {
                         try
                         {
+                            // Keep this at the top so the file size is still tracked even if extraction errors out (i.e. wrong engine version)
+                            if (config.CreateNewCheckpoint) newCheckpointDict.TryAdd(file.Value.Path, file.Value.Size);
+
                             var matches = GetRegexMatches(file.Value.Path, config).ToList();
 
                             if (matches.Count > 0 && !IsExcluded(file.Value.Path, config))
@@ -117,8 +120,6 @@ public class ExportService
                                         ExportFile(provider, file.Value, ext, match.OutputType, packageObjects);
                                 }
                             }
-
-                            if (config.CreateNewCheckpoint) newCheckpointDict.TryAdd(file.Value.Path, file.Value.Size);
 
                             Interlocked.Increment(ref processedFiles);
                             Refresh();

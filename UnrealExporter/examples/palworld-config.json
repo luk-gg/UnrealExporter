@@ -5,6 +5,8 @@
   "EngineVersion": "5.1",
   "AesKeys": [],
   "MappingFileName": "Palworld.usmap",
+  "CreateNewCheckpoint": true,
+  "CheckpointFileName": "palworld-checkpoint.json",
   "ExportPaths": [
     "Pal/Content/Pal/Blueprint/Character/.*\\.uasset:json",
     "Pal/Content/Pal/DataAsset/.*\\.uasset:json",

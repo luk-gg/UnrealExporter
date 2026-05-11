@@ -39,6 +39,9 @@ Checkpoints allow you to extract only new/modified files and skip unchanged file
 > [!TIP]
 > You can quickly create a checkpoint without extracting anything by using the flags `--create-checkpoint --exclude "*"`
 
+> [!TIP]
+> `CreateNewCheckpoint` (bool) and `CheckpointFileName` (filename.json) can optionally be added to your config files (see the [example config](/UnrealExporter/examples/palworld-config.json)).
+
 ## Helpful resources
 AES Keys:
 - [cs.rin.ru UE4/5 Key Collection](https://cs.rin.ru/forum/viewtopic.php?f=10&t=100672)
