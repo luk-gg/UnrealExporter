@@ -9,7 +9,5 @@ desktop.ini
 /UnrealExporter/bin
 /UnrealExporter/obj
 /UnrealExporter/configs/*.json
-!/UnrealExporter/configs/_*.json
 /UnrealExporter/mappings/*.usmap
 /UnrealExporter/checkpoints/*.json
-!/UnrealExporter/checkpoints/_*.json

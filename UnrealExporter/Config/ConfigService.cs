@@ -240,7 +240,6 @@ public class ConfigService
                 var config = LoadConfig(path);
                 if (config is null) continue;
                 var fileName = Path.GetFileName(path);
-                if (fileName.StartsWith('_')) continue;
                 options.Add(new SelectionOption
                 {
                     Label = $"{config.ConfigTitle} [dim]({fileName})[/]",
