@@ -51,6 +51,7 @@ public class ExportService
             newCheckpointDict = [];
 
             var totalFiles = provider.Files.Count;
+            int onePct = (int)totalFiles / 100;
             int processedFiles = 0;
             string currentFile = "";
 
@@ -70,18 +71,18 @@ public class ExportService
                     {
                         lock (_refreshLock)
                         {
-                            // Refresh every 1%
-                            if (processedFiles > 0 && (processedFiles % (totalFiles / 100) == 0 || processedFiles >= totalFiles - (totalFiles / 100)))
+                            // Update only every 1% or when > 99%. currentFile will be stale, but performance impact will be negligible.
+                            if (processedFiles % onePct == 0 || processedFiles > (99 * onePct))
                             {
                                 var pct = (double)processedFiles / totalFiles;
-                                var filled = (int)(pct * 40);
+                                var filled = (int)Math.Ceiling(pct * 40);
                                 var bar = $"[green]{new string('━', filled)}[/][grey]{new string('━', 40 - filled)}[/]";
                                 var stats = $"Matched [blue]{matchedFiles}[/]  Exported [blue]{totalExportedFiles}[/]  Elapsed [blue]{TimeHelpers.TimeSince(start)}[/]";
                                 if (processedFiles == totalFiles) stats = "[dim]" + stats + "[/]";
 
                                 table.Rows.Clear();
                                 table.AddRow(new Markup($"[dim]{Markup.Escape(currentFile)}[/]"));
-                                table.AddRow(new Markup($"{bar} [green]{Math.Round(pct * 100)}%[/]\n"));
+                                table.AddRow(new Markup($"{bar} [green]{processedFiles / onePct}%[/]\n"));
                                 table.AddRow(new Markup(stats));
                                 ctx.Refresh();
                             }
@@ -93,8 +94,10 @@ public class ExportService
                     {
                         try
                         {
+                            currentFile = file.Value.Path;
+
                             // Keep this at the top so the file size is still tracked even if extraction errors out (i.e. wrong engine version)
-                            if (config.CreateNewCheckpoint) newCheckpointDict.TryAdd(file.Value.Path, file.Value.Size);
+                            if (config.CreateNewCheckpoint) newCheckpointDict.TryAdd(currentFile, file.Value.Size);
 
                             var matches = GetRegexMatches(file.Value.Path, config).ToList();
 

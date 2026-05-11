@@ -17,7 +17,7 @@ public class ExporterCli : Command<CliSettings>
                 var configPath = Path.Combine(ConfigService.ConfigsDirectory, PathHelpers.ForceExtension(settings.ConfigFile, ".json"));
                 config = ConfigService.LoadConfig(configPath);
             }
-            Console.WriteLine(config.CreateNewCheckpoint);
+            
             // Append CLI arguments (overwrite config keys if collision)
             AppendSettingsToConfig(settings, config);
         }
