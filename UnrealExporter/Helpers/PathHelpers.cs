@@ -6,27 +6,6 @@ public static class PathHelpers
 {
     public static string Slugify(string input) => new SlugHelper().GenerateSlug(input);
 
-    public static string NormalizePath(string path, bool allowEmpty = false)
-    {
-        if (!allowEmpty && string.IsNullOrWhiteSpace(path))
-            throw new ArgumentException("Path cannot be null or empty.");
-
-        path = path.Trim().Trim('"');
-        path = Environment.ExpandEnvironmentVariables(path);
-
-        try
-        {
-            var fullPath = Path.GetFullPath(path);
-            fullPath = Path.GetFullPath(new Uri(fullPath).LocalPath)
-                           .TrimEnd(Path.DirectorySeparatorChar);
-            return fullPath;
-        }
-        catch (Exception ex)
-        {
-            throw new ArgumentException($"Invalid path: {path}. {ex.Message}", ex);
-        }
-    }
-
     // TODO: handle Base64? keys
     // Blade & Soul Revolution (Android)   78aeb4da56eb4ab89ea2eb61abd6c5a3
     // Sword Art Online: Fatal Bullet  h67GrjX2aGMgrAQeNwf9VmCYbt50ylJFeP3rIhbxh4e9bZXnqm8sbvEjWGOi6rgs
@@ -76,12 +55,8 @@ public static class PathHelpers
         return true;
     }
 
-    public static string GetValidFileName(string fileName, string? extension)
+    public static string ForceExtension(string fn, string ext)
     {
-        SlugHelper slugHelper = new SlugHelper();
-        var safeFileName = slugHelper.GenerateSlug(fileName);
-        if (!string.IsNullOrEmpty(extension) && !fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-            safeFileName += extension;
-        return safeFileName;
+        return fn.EndsWith(ext, StringComparison.OrdinalIgnoreCase) ? fn : fn + ext;
     }
 }

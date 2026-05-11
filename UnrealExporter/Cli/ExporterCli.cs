@@ -14,8 +14,7 @@ public class ExporterCli : Command<CliSettings>
             // Load config if provided
             if (!string.IsNullOrEmpty(settings.ConfigFile))
             {
-                var configFile = PathHelpers.GetValidFileName(settings.ConfigFile, ".json");
-                var configPath = Path.Combine(ConfigService.ConfigsDirectory, configFile);
+                var configPath = Path.Combine(ConfigService.ConfigsDirectory, PathHelpers.ForceExtension(settings.ConfigFile, ".json"));
                 config = ConfigService.LoadConfig(configPath);
             }
 
@@ -30,11 +29,12 @@ public class ExporterCli : Command<CliSettings>
         }
 
         // TODO: check if valid config/sufficient args
-        
+
 #if DEBUG
         AnsiConsole.MarkupLine($"[dim]unrealexporter {ConfigService.StringifyConfig(config)}[/]\n");
 #endif
-
+        Console.WriteLine(config.MappingFileName);
+        Console.WriteLine(settings.MappingFileName);
         var table = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Grey)
@@ -46,9 +46,16 @@ public class ExporterCli : Command<CliSettings>
         table.AddRow("Output path", Markup.Escape(config.OutputPath));
         table.AddRow("Engine version", Markup.Escape(config.EngineVersion));
         table.AddRow($"AES keys ({config.AesKeys.Length})", config.AesKeys.Length > 0 ? string.Join("\n", config.AesKeys.Select(k => Markup.Escape(k))) : "[dim]none[/]");
-        table.AddRow("Mapping file", string.IsNullOrEmpty(config.MappingFile) ? "[dim]none[/]" : Markup.Escape(config.MappingFile));
+        table.AddRow("Mapping file", string.IsNullOrEmpty(config.MappingFileName) ? "[dim]none[/]" : PathHelpers.ForceExtension(config.MappingFileName, ".usmap"));
         table.AddRow($"Export paths ({config.ExportPaths.Length})", config.ExportPaths.Length > 0 ? string.Join("\n", config.ExportPaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
         table.AddRow($"Exclude paths ({config.ExcludePaths.Length})", config.ExcludePaths.Length > 0 ? string.Join("\n", config.ExcludePaths.Select(p => Markup.Escape(p))) : "[dim]none[/]");
+        table.AddRow("Checkpoint file",
+            string.IsNullOrEmpty(config.CheckpointFileName)
+            ? "[dim]none[/]"
+            : config.CheckpointFileName == "latest"
+                ? $"[blue]{config.CheckpointFileName}[/]"
+                : PathHelpers.ForceExtension(config.CheckpointFileName, ".json"));
+        table.AddRow("Create new checkpoint", config.CreateNewCheckpoint ? "true" : "[dim]false[/]");
 
         AnsiConsole.Write(table);
 

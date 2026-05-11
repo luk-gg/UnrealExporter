@@ -1,7 +1,6 @@
 using Spectre.Console;
 using Newtonsoft.Json;
 using System.Diagnostics;
-using Slugify;
 
 public class ConfigService
 {
@@ -93,7 +92,7 @@ public class ConfigService
         // TODO: Check if mapping file exists at start of extraction
         AnsiConsole.MarkupLine($"If your game needs a mapping file, enter the name of the file, which should be placed in UnrealExporter/mappings [dim](MyGame.usmap)[/]:");
         AnsiConsole.MarkupLine("[dim italic]Leave blank to skip[/]");
-        config.MappingFile = Ask();
+        config.MappingFileName = Ask();
         AnsiConsole.WriteLine("");
 
 
@@ -123,14 +122,13 @@ public class ConfigService
         AnsiConsole.WriteLine("");
 
 
-        var fileName = PathHelpers.GetValidFileName(
-                Ask(
-                    "Name your config file",
-                    PathHelpers.GetValidFileName(config.ConfigTitle, ".json"),
-                    true
-                ),
-                ".json");
+        var fileName = Ask(
+            "Name your config file",
+            PathHelpers.Slugify(PathHelpers.ForceExtension(config.ConfigTitle, ".json")),
+            true
+        );
 
+        fileName = PathHelpers.Slugify(PathHelpers.ForceExtension(fileName, ".json"));
 
         var path = Path.Combine(ConfigsDirectory, fileName);
 
@@ -302,7 +300,7 @@ public class ConfigService
         Add("-p", config.GamePath);
         Add("-o", config.OutputPath);
         AddMany("--aes", config.AesKeys ?? []);
-        Add("--map", config.MappingFile);
+        Add("--map", config.MappingFileName);
         AddMany("--export", config.ExportPaths ?? []);
         AddMany("--exclude", config.ExcludePaths ?? []);
 

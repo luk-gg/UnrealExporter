@@ -1,6 +1,6 @@
 using Spectre.Console.Cli;
 using System.ComponentModel;
-
+// TODO: proofread these
 public sealed class CliSettings : CommandSettings
 {
     [CommandArgument(0, "[config]")]
@@ -27,9 +27,9 @@ public sealed class CliSettings : CommandSettings
     [Description("AES decryption key (repeatable)")]
     public string[] AesKeys { get; set; } = [];
 
-    [CommandOption("--map")]
+    [CommandOption("-m|--map")]
     [Description("Name of .usmap file in /mappings")]
-    public string MappingFile { get; set; } = "";
+    public string MappingFileName { get; set; } = "";
 
     [CommandOption("-e|--export")]
     [Description("Virtual paths to extract (regex) (repeatable)")]
@@ -38,4 +38,12 @@ public sealed class CliSettings : CommandSettings
     [CommandOption("-x|--exclude")]
     [Description("Virtual paths to exclude from extraction (regex) (repeatable)")]
     public string[] ExcludePaths { get; set; } = [];
+
+    [CommandOption("--create-checkpoint")]
+    [Description("")]
+    public bool CreateNewCheckpoint { get; set; } = false;
+
+    [CommandOption("-c|--checkpoint")]
+    [Description("")]
+    public string? CheckpointFileName { get; set; } = null;
 }

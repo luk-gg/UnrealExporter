@@ -4,7 +4,7 @@
   "OutputPath": "C:/Program Files (x86)/Steam/steamapps/common/Palworld/extracted",
   "EngineVersion": "5.1",
   "AesKeys": [],
-  "MappingFile": "Palworld.usmap",
+  "MappingFileName": "Palworld.usmap",
   "ExportPaths": [
     "Pal/Content/Pal/Blueprint/Character/.*\\.uasset:json",
     "Pal/Content/Pal/DataAsset/.*\\.uasset:json",

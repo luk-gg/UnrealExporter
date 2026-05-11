@@ -4,7 +4,7 @@ public sealed class SelectionOption
     public ConfigObj? Config { get; set; }
     public string ConfigPath { get; set; } = "";
 }
-
+// TODO: proofread these
 public sealed class ConfigObj
 {
     /// <summary>
@@ -39,9 +39,9 @@ public sealed class ConfigObj
     public string[] AesKeys { get; set; } = [];
 
     /// <summary>
-    /// An absolute path to a <c>.usmap</c> file to load.
+    /// Name of <c>.usmap</c> file in /mappings.
     /// </summary>
-    public string MappingFile { get; set; } = "";
+    public string MappingFileName { get; set; } = "";
 
     /// <summary>
     /// A list of virtual file paths to assets to be extracted.
@@ -55,4 +55,14 @@ public sealed class ConfigObj
     /// A list of virtual file paths to assets to be <b>excluded</b> from extraction, useful for avoiding files that crash CUE4Parse.
     /// </summary>
     public string[] ExcludePaths { get; set; } = [];
+
+    /// <summary>
+    /// Whether or not to create a new checkpoint file.
+    /// </summary>
+    public bool CreateNewCheckpoint { get; set; } = false;
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public string? CheckpointFileName { get; set; } = null;
 }

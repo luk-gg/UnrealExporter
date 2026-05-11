@@ -30,6 +30,8 @@ public class ExportService
 
     private static ConcurrentBag<string> errors = [];
 
+    private static ConcurrentDictionary<string, long> newCheckpointDict = [];
+
     public static void InitExporter(ConfigObj config)
     {
         try
@@ -45,6 +47,8 @@ public class ExportService
             totalExportedFiles = 0;
             errors = [];
             outputBaseDir = config.OutputPath;
+            var checkpoint = LoadCheckpoint(config);
+            newCheckpointDict = [];
 
             var totalFiles = provider.Files.Count;
             int processedFiles = 0;
@@ -95,16 +99,26 @@ public class ExportService
                             {
                                 Interlocked.Increment(ref matchedFiles);
 
-                                var ext = Path.GetExtension(file.Value.Path).TrimStart('.').ToLower();
+                                var passesCheckpoint =
+                                    checkpoint == null
+                                    || !checkpoint.TryGetValue(file.Value.Path, out var prevSize)
+                                    || file.Value.Size != prevSize;
 
-                                // Only load package objects once even if the file is exported in multiple formats (i.e. jpg + png)
-                                IEnumerable<UObject>? packageObjects = (ext is "uasset" or "umap") && matches.Count > 1
-                                    ? provider.LoadPackage(file.Value.Path).GetExports()
-                                    : null;
+                                if (passesCheckpoint)
+                                {
+                                    var ext = Path.GetExtension(file.Value.Path).TrimStart('.').ToLower();
 
-                                foreach (var match in matches)
-                                    ExportFile(provider, file.Value, ext, match.OutputType, packageObjects);
+                                    // Only load package objects once even if the file is exported in multiple formats (i.e. jpg + png)
+                                    IEnumerable<UObject>? packageObjects = (ext is "uasset" or "umap") && matches.Count > 1
+                                        ? provider.LoadPackage(file.Value.Path).GetExports()
+                                        : null;
+
+                                    foreach (var match in matches)
+                                        ExportFile(provider, file.Value, ext, match.OutputType, packageObjects);
+                                }
                             }
+
+                            if (config.CreateNewCheckpoint) newCheckpointDict.TryAdd(file.Value.Path, file.Value.Size);
 
                             Interlocked.Increment(ref processedFiles);
                             Refresh();
@@ -125,7 +139,9 @@ public class ExportService
                     AnsiConsole.MarkupLine($"[dim red]{Markup.Escape(error)}[/]");
             }
 
-            AnsiConsole.MarkupLine($"\n{emoji} UnrealExporter finished in [blue]{TimeHelpers.TimeSince(start)}[/] with {errorTotal} [dim](outputted to [underline link={new Uri(outputBaseDir).AbsoluteUri}]{outputBaseDir}[/])[/]");
+            if (config.CreateNewCheckpoint) CreateCheckpoint(newCheckpointDict, config);
+
+            AnsiConsole.MarkupLine($"\n{emoji} UnrealExporter finished in [blue]{TimeHelpers.TimeSince(start)}[/] with {errorTotal} [dim](extracted to [underline link={new Uri(outputBaseDir).AbsoluteUri}]{outputBaseDir}[/])[/]");
 
         }
         catch (OperationCanceledException)
@@ -162,10 +178,63 @@ public class ExportService
 
         // provider.LoadLocalization(ELanguage.English);
 
-        string usmapPath = $"{AppContext.BaseDirectory}\\mappings\\{config.MappingFile}";
+        string usmapPath = Path.Combine(AppContext.BaseDirectory, "mappings", PathHelpers.ForceExtension(config.MappingFileName, ".usmap"));
         if (File.Exists(usmapPath)) provider.MappingsContainer = new FileUsmapTypeMappingsProvider(usmapPath);
 
         return provider;
+    }
+
+    public static Dictionary<string, long>? LoadCheckpoint(ConfigObj config)
+    {
+        if (string.IsNullOrEmpty(config.CheckpointFileName)) return null;
+
+        string checkpointFolder = Path.Combine(AppContext.BaseDirectory, "checkpoints");
+
+        if (!Directory.Exists(checkpointFolder))
+        {
+            Directory.CreateDirectory(checkpointFolder);
+            AnsiConsole.MarkupLine($"[yellow]Warning: no checkpoints found. Defaulting to exporting all files.[/]");
+            return null;
+        }
+
+        if (config.CheckpointFileName == "latest")
+        {
+            var latest = Directory.GetFiles(checkpointFolder)
+                .Where(p => Path.GetFileName(p).StartsWith(PathHelpers.Slugify(config.ConfigTitle ?? ""), StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => p)
+                .LastOrDefault();
+
+            if (latest == null)
+            {
+                AnsiConsole.MarkupLine($"[yellow]Warning: no checkpoints found for \"{Markup.Escape(config.ConfigTitle ?? "")}\". Defaulting to exporting all files.[/]");
+                return null;
+            }
+
+            AnsiConsole.MarkupLine($"\n[dim]Using latest checkpoint: {Markup.Escape(Path.GetFileName(latest))}[/]");
+            return JsonConvert.DeserializeObject<Dictionary<string, long>>(File.ReadAllText(latest));
+        }
+
+        string checkpointPath = Path.Combine(checkpointFolder, PathHelpers.ForceExtension(config.CheckpointFileName, ".json"));
+
+        if (!File.Exists(checkpointPath))
+        {
+            AnsiConsole.MarkupLine($"[yellow]Warning: checkpoint \"{config.CheckpointFileName}\" does not exist in checkpoints folder. Defaulting to exporting all files.[/]");
+            return null;
+        }
+
+        return JsonConvert.DeserializeObject<Dictionary<string, long>>(File.ReadAllText(checkpointPath));
+    }
+
+    public static void CreateCheckpoint(ConcurrentDictionary<string, long> newCheckpointDict, ConfigObj config)
+    {
+        string checkpointFolder = Path.Combine(AppContext.BaseDirectory, "checkpoints");
+        if (!Directory.Exists(checkpointFolder)) Directory.CreateDirectory(checkpointFolder);
+
+        var checkpointFileName = $"{PathHelpers.Slugify(config.ConfigTitle ?? "")}_{DateTime.Now.ToString("yyyy-MM-dd_HH-mm")}.json";
+        string checkpointPath = Path.Combine(checkpointFolder, checkpointFileName);
+
+        File.WriteAllText(checkpointPath, JsonConvert.SerializeObject(newCheckpointDict, Formatting.Indented));
+        AnsiConsole.MarkupLine($"\n[green]:check_mark:[/] Saved checkpoint: [underline link={new Uri(checkpointPath).AbsoluteUri}]{checkpointPath}[/].");
     }
 
     static IEnumerable<ExportMatch> GetRegexMatches(string filePath, ConfigObj config) =>

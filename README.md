@@ -2,9 +2,9 @@
 A CLI for extracting and datamining Unreal Engine game assets, powered by [CUE4Parse](https://github.com/FabianFG/CUE4Parse).
 
 ## [Features](#features)
-- [x] Regex paths for bulk exporting
+- [x] Regex paths for bulk extracting
 - [x] Path exclusions to avoid crashing
-- [x] [Checkpoint system](#checkpoints) (only export new/changed files)
+- [x] [Checkpoint system](#checkpoints) (only extract new/changed files)
 - [x] Parallel-processing files
 - [x] Apply mapping files
 - [x] Supports [30+ file types](/UnrealExporter/Export/ExportService.cs#L186) seen in UE games
@@ -22,6 +22,11 @@ After using [FModel](https://github.com/4sval/FModel) to determine which paths y
 2. Clone the repo, including all submodules, with `git clone https://github.com/whotookzakum/UnrealExporter --recursive`
 3. In your terminal, run `dotnet run --project UnrealExporter --`
 
+Example command:
+```
+dotnet run --project UnrealExporter -- pal.json -m MappingOverride.usmap --create-checkpoint --checkpoint latest
+```
+
 If you wish to build the project as a executable binary, use the following command:
 
 ```sh
@@ -29,10 +34,10 @@ dotnet publish -c Release --self-contained true -p:PublishSingleFile=true -p:Deb
 ```
 
 ## [Checkpoints](#checkpoints)
-Checkpoints allow you to extract only new/modified files and skip unchanged files by keeping track of file sizes (see [example checkpoint](/UnrealExporter/checkpoints/_example.ckpt)), greatly increasing extraction speed. **Checkpoints will always track all game files, regardless of what you export/exclude.** Thus it is safe to use an existing checkpoint and create a new checkpoint at the same time to only extract changed files every time a game updates.
+Checkpoints allow you to extract only new/modified files and skip unchanged files by keeping track of file sizes (see [example checkpoint](/UnrealExporter/checkpoints/_example.json)), greatly increasing extraction speed. **Checkpoints will always track all game files, regardless of what you extract/exclude.** Thus it is safe to use an existing checkpoint *and* create a new checkpoint at the same time to repeatedly only extract changed files every time a game updates.
 
 > [!TIP]
-> You can quickly create a checkpoint without extracting anything by using the flags `--create-ckpt --exclude *`
+> You can quickly create a checkpoint without extracting anything by using the flags `--create-checkpoint --exclude "*"`
 
 ## Helpful resources
 AES Keys:
@@ -71,6 +76,5 @@ The exporter should now be able to detect the game files.
 
  -->
 
-<!-- TODO: reimplement checkpoints -->
 <!-- TODO: reimplement locale -->
 <!-- TODO: implement extracting audio (.hca → .wav in SAOFD; .wem, .bnk, .pck in Fmodel Extract(); .ogg, .wav, .opus, .mp3 outputs) -->
