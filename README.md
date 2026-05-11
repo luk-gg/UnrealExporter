@@ -75,9 +75,9 @@ The exporter should now be able to detect the game files.
 <!-- 
   NOTES FOR CHECKING EDGE CASES:
   - Patch files (_0_P.pak, etc.) being applied in order can be validated with SWORD ART ONLINE Fractured Daydream: export "SEVEN_Product/Content/Product/DataTable/DT_PassiveSkillData.uasset" -- UCR004_FlightMaster (Leafa's passive) m_strength should be 25.0 (SAOFD-Windows_0_P.utoc), not 10.0 (SAOFD-Windows.utoc)
+    - Also in Tower of Fantasy Global: "Hotta/Content/Localization/Game/en/.*\\.locres:json" exports twice (pakchunk0-WindowsNoEditor.pak and pakchunk0-WindowsNoEditor_0_P.pak; patch pak is larger and gets used, however it does count the regex match and export count twice)
   - zlib dll can be validated with Tower of Fantasy Global: try to extract anything
   - Detex dll can be validated with SWORD ART ONLINE Fractured Daydream: try to extract "SEVEN_Product/Content/Product/UI/Texture/Common/ButtonWindowBase/.*\\.uasset:png"
-
  -->
 
 <!-- TODO: reimplement locale -->

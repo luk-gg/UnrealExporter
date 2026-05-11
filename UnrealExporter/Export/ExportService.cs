@@ -71,8 +71,8 @@ public class ExportService
                     {
                         lock (_refreshLock)
                         {
-                            // Update only every 1% or when > 99%. currentFile will be stale, but performance impact will be negligible.
-                            if (processedFiles % onePct == 0 || processedFiles > (99 * onePct))
+                            // Update only every 1% or last 100 files. currentFile will be stale, but performance impact will be negligible.
+                            if (processedFiles % onePct == 0 || processedFiles >= 100 * onePct - 100)
                             {
                                 var pct = (double)processedFiles / totalFiles;
                                 var filled = (int)Math.Ceiling(pct * 40);
