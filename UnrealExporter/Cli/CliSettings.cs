@@ -1,6 +1,6 @@
 using Spectre.Console.Cli;
 using System.ComponentModel;
-// TODO: proofread these
+// Keep these descriptions identical to UnrealExporter/Config/ConfigObj.cs
 public sealed class CliSettings : CommandSettings
 {
     [CommandArgument(0, "[config]")]

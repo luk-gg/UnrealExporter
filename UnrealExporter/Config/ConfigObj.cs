@@ -4,7 +4,7 @@ public sealed class SelectionOption
     public ConfigObj? Config { get; set; }
     public string ConfigPath { get; set; } = "";
 }
-
+// Keep these descriptions identical to UnrealExporter/Cli/CliSettings.cs
 public sealed class ConfigObj
 {
     /// <summary>
