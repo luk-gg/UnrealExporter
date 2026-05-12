@@ -8,7 +8,7 @@ public class ConfigService
 
     public static void CreateConfig()
     {
-        // AnsiConsole.Clear();
+        AnsiConsole.Clear();
         AnsiConsole.MarkupLine("Values in [dim]parentheses[/] are examples, and [green]green[/] values will auto-complete if left blank.\n");
 
 

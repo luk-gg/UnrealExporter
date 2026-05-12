@@ -82,3 +82,4 @@ The exporter should now be able to detect the game files.
 
 <!-- TODO: reimplement locale -->
 <!-- TODO: implement extracting audio (.hca → .wav in SAOFD; .wem, .bnk, .pck in Fmodel Extract(); .ogg, .wav, .opus, .mp3 outputs) -->
+<!-- TODO: fix non-english character parsing (Korean text breaks SevenDeadlySins/Content/Table/CharacterExtentions/SwimTable.uasset SevenDeadlySins/Content/Table/GameModeSelect/GameModeSettingTable.uasset) -->
