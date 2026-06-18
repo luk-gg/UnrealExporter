@@ -12,9 +12,7 @@ A CLI for extracting and datamining Unreal Engine game assets, powered by [CUE4P
 
 All games supported by FModel are supported, as both use CUE4Parse.
 
-## Usage
-UnrealExporter can be used entirely with flags (run with `--help` or see [here](/UnrealExporter/Cli/CliSettings.cs)), or you can create reusable config files. If both are provided, flags will override config values. An interactive config builder is available when running the exe without any arguments (or see [example config](/UnrealExporter/examples/palworld-config.json)).
-
+## Setup
 ### Download and run
 After using [FModel](https://github.com/4sval/FModel) to determine which paths you wish you extract, download the latest [release](https://github.com/whotookzakum/UnrealExporter/releases) and run `UnrealExporter.exe`. 
 
@@ -34,6 +32,11 @@ If you wish to build the project as a executable binary, use the following comma
 dotnet publish UnrealExporter -c Release --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false
 ```
 
+## Usage
+UnrealExporter uses reusable config files stored in the `configs` folder (see [example config](/UnrealExporter/examples/palworld-config.json)). Run the program without any arguments to launch the interactive config builder.
+
+For advanced usage, UnrealExporter also accepts command-line arguments — run with `--help` or see [available options](/UnrealExporter/Cli/CliSettings.cs). Command-line arguments override config values when both are provided.
+
 ## Checkpoints
 Checkpoints allow you to extract only new/modified files and skip unchanged files by keeping track of file sizes (see [example checkpoint](/UnrealExporter/examples/palworld-checkpoint.json)), greatly increasing extraction speed. **Checkpoints will always track all game files, regardless of what you extract/exclude.** Thus it is safe to use an existing checkpoint *and* create a new checkpoint at the same time to repeatedly only extract changed files every time a game updates.
 
@@ -42,6 +45,9 @@ Checkpoints allow you to extract only new/modified files and skip unchanged file
 
 > [!TIP]
 > `CreateNewCheckpoint` (bool) and `CheckpointFileName` (filename.json) can optionally be added to your config files (see the [example config](/UnrealExporter/examples/palworld-config.json)).
+
+> [!NOTE]
+> When adding new ExportPaths to your config, make sure to run UnrealExporter without a checkpoint so the paths you just added will be exported. Otherwise, those paths will not be exported until their contents change.
 
 ## Helpful resources
 AES Keys:
